@@ -37,6 +37,8 @@ export default function AlertsPanel({ carId }: { carId: string }) {
   const [statusFilter, setStatusFilter] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [triagingId, setTriagingId] = useState<string | null>(null)
+  const [triageByAlert, setTriageByAlert] = useState<Record<string, string>>({})
 
   const load = () => {
     setLoading(true)
@@ -62,6 +64,16 @@ export default function AlertsPanel({ carId }: { carId: string }) {
     } else {
       toast.error(r.error || 'Erro ao atualizar alerta')
     }
+  }
+
+  const runTriage = async (id: string) => {
+    setTriagingId(id)
+    const response = await apiFetch('/ai/triage', { method: 'POST', body: JSON.stringify({ alertId: id }) })
+    setTriagingId(null)
+    if (response.suggestion) {
+      setTriageByAlert((current) => ({ ...current, [id]: response.suggestion }))
+      setExpanded(id)
+    } else toast.error(response.error || 'Não foi possível gerar a triagem')
   }
 
   return (
@@ -115,9 +127,22 @@ export default function AlertsPanel({ carId }: { carId: string }) {
                 >
                   {expanded === a.id ? 'Ocultar notas' : '📝 Notas'}
                 </button>
+                <button
+                  className="text-xs text-emerald-300 hover:text-emerald-200 px-2 py-1"
+                  onClick={() => runTriage(a.id)}
+                  disabled={triagingId === a.id}
+                >
+                  {triagingId === a.id ? 'Analisando...' : 'Triagem IA'}
+                </button>
               </div>
               {expanded === a.id && (
                 <div className="mt-3 border-t border-white/5 pt-3">
+                  {triageByAlert[a.id] && (
+                    <div className="mb-3 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm leading-6 text-slate-300 whitespace-pre-wrap">
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-emerald-300">Sugestão da IA</p>
+                      {triageByAlert[a.id]}
+                    </div>
+                  )}
                   <textarea
                     className="input-field text-sm"
                     rows={2}
