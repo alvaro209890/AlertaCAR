@@ -299,7 +299,7 @@ O consultor não tem 1 imóvel: tem uma **carteira**. Toda a navegação assume 
 
 ### 8.1 Organização
 - [x] **Clientes/Pastas**: agrupar CARs por cliente final (proprietário)
-- [ ] **Tags** e **cores** por imóvel; filtro e busca por cliente/tag/município — criação/atribuição e cores entregues; filtros e busca pendentes
+- [x] **Tags** e **cores** por imóvel; filtro e busca por cliente/tag/município
 - [x] Renomear/apelidar imóvel
 
 ### 8.2 Importação em massa 🆕

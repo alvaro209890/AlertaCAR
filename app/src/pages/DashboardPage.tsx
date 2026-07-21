@@ -18,6 +18,9 @@ export default function DashboardPage() {
   const [checking, setChecking] = useState<string | null>(null)
   const [checkMsg, setCheckMsg] = useState<{ carId: string; text: string; type: 'ok' | 'err' } | null>(null)
   const [riskByCar, setRiskByCar] = useState<Record<string, { score: number; band: string }>>({})
+  const [search, setSearch] = useState('')
+  const [clientFilter, setClientFilter] = useState('')
+  const [tagFilter, setTagFilter] = useState('')
 
   const loadCars = () => {
     apiFetch('/cars').then(async r => {
@@ -76,6 +79,13 @@ export default function DashboardPage() {
 
   const totalArea = cars.reduce((sum, c) => sum + (c.areaHa || 0), 0)
   const totalAlerts = cars.reduce((sum, c) => sum + c.alertCount, 0)
+  const clients = [...new Map(cars.filter((car) => car.client).map((car) => [car.client!.id, car.client!])).values()].sort((a, b) => a.name.localeCompare(b.name))
+  const tags = [...new Map(cars.flatMap((car) => car.tags).map((tag) => [tag.id, tag])).values()].sort((a, b) => a.name.localeCompare(b.name))
+  const normalizedSearch = search.trim().toLocaleLowerCase('pt-BR')
+  const filteredCars = cars.filter((car) => {
+    const matchesText = !normalizedSearch || [car.nickname, car.carNumber, car.municipality, car.client?.name, ...car.tags.map((tag) => tag.name)].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR').includes(normalizedSearch)
+    return matchesText && (!clientFilter || car.client?.id === clientFilter) && (!tagFilter || car.tags.some((tag) => tag.id === tagFilter))
+  })
 
   return (
     <div className="min-h-screen p-6">
@@ -169,7 +179,19 @@ export default function DashboardPage() {
                 + Adicionar
               </button>
             </div>
-            {cars.map(car => (
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <input className="input-field py-2" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar CAR, cliente, tag ou município" />
+              <select className="input-field w-auto py-2" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
+                <option value="">Todos os clientes</option>
+                {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+              </select>
+              <select className="input-field w-auto py-2" value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
+                <option value="">Todas as tags</option>
+                {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+              </select>
+            </div>
+            <p className="text-sm text-slate-500">{filteredCars.length} de {cars.length} {cars.length === 1 ? 'imóvel' : 'imóveis'}</p>
+            {filteredCars.map(car => (
               <div
                 key={car.id}
                 className="glass-card p-5 hover:bg-slate-800/30 transition-colors group cursor-pointer"
@@ -253,6 +275,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))}
+            {filteredCars.length === 0 && <div className="glass-card p-8 text-center text-slate-400">Nenhum imóvel corresponde aos filtros.</div>}
           </div>
         )}
       </div>
