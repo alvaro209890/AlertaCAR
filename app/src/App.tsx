@@ -215,6 +215,9 @@ function DashboardPage() {
   const [adding, setAdding] = useState(false)
   const [addMsg, setAddMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [checking, setChecking] = useState<string | null>(null)
+  const [checkMsg, setCheckMsg] = useState<{ carId: string; text: string; type: 'ok' | 'err' } | null>(null)
+  const [expandedCar, setExpandedCar] = useState<string | null>(null)
 
   const loadCars = () => {
     apiFetch('/cars').then(r => {
@@ -248,6 +251,21 @@ function DashboardPage() {
     await apiFetch(`/cars/${id}`, { method: 'DELETE' })
     setDeleting(null)
     loadCars()
+  }
+
+  const handleCheck = async (carId: string) => {
+    setChecking(carId)
+    setCheckMsg(null)
+    const r = await apiFetch(`/sccon/check/${carId}`, { method: 'POST' })
+    setChecking(null)
+    if (r.error) {
+      setCheckMsg({ carId, text: r.error, type: 'err' })
+    } else {
+      setCheckMsg({ carId, text: `${r.alertsNew} novos de ${r.alertsFound} encontrados`, type: 'ok' })
+      loadCars() // refresh alert counts
+      setExpandedCar(carId)
+    }
+    setTimeout(() => setCheckMsg(null), 8000)
   }
 
   const totalArea = cars.reduce((sum, c) => sum + (c.areaHa || 0), 0)
@@ -379,19 +397,102 @@ function DashboardPage() {
                         <span>🕐 Atualizado {new Date(car.lastPolygonFetch).toLocaleDateString('pt-BR')}</span>
                       )}
                     </div>
+
+                    {/* Check message */}
+                    {checkMsg && checkMsg.carId === car.id && (
+                      <div className={`mt-3 text-xs px-3 py-1.5 rounded ${
+                        checkMsg.type === 'ok' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                      }`}>
+                        {checkMsg.type === 'ok' ? '✅ ' : '❌ '}{checkMsg.text}
+                      </div>
+                    )}
+
+                    {/* Expanded alert details */}
+                    {expandedCar === car.id && car.alertCount > 0 && (
+                      <AlertTimeline carId={car.id} />
+                    )}
                   </div>
-                  <button
-                    onClick={() => handleDelete(car.id)}
-                    disabled={deleting === car.id}
-                    className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 ml-3 p-1"
-                    title="Remover"
-                  >
-                    {deleting === car.id ? '⏳' : '✕'}
-                  </button>
+                  
+                  <div className="flex flex-col gap-1 ml-3">
+                    <button
+                      onClick={() => handleCheck(car.id)}
+                      disabled={checking === car.id}
+                      className="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors opacity-0 group-hover:opacity-100 whitespace-nowrap"
+                      title="Verificar alertas SCCON"
+                    >
+                      {checking === car.id ? '⏳ Verificando...' : '🔍 Verificar'}
+                    </button>
+                    <button
+                      onClick={() => setExpandedCar(expandedCar === car.id ? null : car.id)}
+                      className="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors opacity-0 group-hover:opacity-100 whitespace-nowrap"
+                    >
+                      {expandedCar === car.id ? '📋 Ocultar' : '📋 Alertas'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(car.id)}
+                      disabled={deleting === car.id}
+                      className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 p-1"
+                      title="Remover"
+                    >
+                      {deleting === car.id ? '⏳' : '✕'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// --------------- Alert Timeline ---------------
+function AlertTimeline({ carId }: { carId: string }) {
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    apiFetch(`/cars/${carId}`).then(r => {
+      if (r.alerts) setAlerts(r.alerts)
+      setLoading(false)
+    })
+  }, [carId])
+
+  if (loading) return <div className="mt-3 text-xs text-slate-500">Carregando alertas...</div>
+  if (alerts.length === 0) return <div className="mt-3 text-xs text-slate-500">Nenhum alerta registrado</div>
+
+  const classColors: Record<string, string> = {
+    'CUT': 'border-red-500 bg-red-500/10',
+    'MINERAL_EXTRACTION': 'border-red-500 bg-red-500/10',
+    'DEGRADATION_CHEMICAL_AGENT': 'border-red-500 bg-red-500/10',
+    'SELECTIVE_EXTRACTION': 'border-orange-500 bg-orange-500/10',
+    'DEGRADATION_SELECTIVE_CUT': 'border-orange-500 bg-orange-500/10',
+    'BURN_SCAR': 'border-yellow-500 bg-yellow-500/10',
+    'FOCUS_OF_BURN': 'border-yellow-500 bg-yellow-500/10',
+    'AIRSTRIP_OPENING': 'border-amber-500 bg-amber-500/10',
+    'ACCESS': 'border-amber-500 bg-amber-500/10',
+  }
+
+  return (
+    <div className="mt-3 border-t border-white/5 pt-3">
+      <p className="text-xs text-slate-500 mb-2">Histórico de alertas SCCON</p>
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {alerts.slice(0, 10).map((a: any) => (
+          <div key={a.id} className={`text-xs p-2 rounded border ${classColors[a.classType] || 'border-slate-700 bg-slate-800/50'}`}>
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{a.title}</span>
+              <span className="text-slate-500">{new Date(a.detectedDate).toLocaleDateString('pt-BR')}</span>
+            </div>
+            <div className="flex gap-3 mt-1 text-slate-400">
+              {a.areaHa > 0 && <span>📐 {a.areaHa.toFixed(2)} ha</span>}
+              <span>🆔 {a.sourceId}</span>
+              {a.sentToWhatsapp ? <span className="text-emerald-400">📱 Notificado</span> : <span className="text-slate-500">⏳ Pendente</span>}
+            </div>
+          </div>
+        ))}
+        {alerts.length > 10 && (
+          <p className="text-xs text-slate-500 text-center">+ {alerts.length - 10} alertas anteriores</p>
         )}
       </div>
     </div>

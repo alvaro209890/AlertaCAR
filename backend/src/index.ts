@@ -7,6 +7,8 @@ import { initializeSchema } from './db/connection.js'
 import authRoutes from './routes/auth.js'
 import adminRoutes from './routes/admin.js'
 import carsRoutes from './routes/cars.js'
+import scconRoutes from './routes/sccon.js'
+import { startCronMonitor } from './cron/monitor.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -29,6 +31,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/cars', carsRoutes)
+app.use('/api/sccon', scconRoutes)
 
 // Servir frontends em produção
 if (config.nodeEnv === 'production') {
@@ -49,6 +52,13 @@ if (config.nodeEnv === 'production') {
 app.listen(config.port, () => {
   console.log(`[server] AlertaCAR rodando na porta ${config.port}`)
   console.log(`[server] Ambiente: ${config.nodeEnv}`)
+  
+  // Iniciar cron de monitoramento (só em produção ou se EXPLICITAMENTE ativado)
+  if (config.nodeEnv === 'production' || process.env.ENABLE_CRON === 'true') {
+    startCronMonitor()
+  } else {
+    console.log('[cron] Monitoramento NÃO iniciado (dev mode). Use ENABLE_CRON=true para ativar.')
+  }
 })
 
 export default app

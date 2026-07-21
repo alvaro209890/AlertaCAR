@@ -131,9 +131,9 @@ function DashboardPage() {
             <li className="text-emerald-400">✅ Auth local (bcrypt + JWT) — Fase 1</li>
             <li className="text-emerald-400">✅ Login admin — Fase 1</li>
             <li className="text-emerald-400">✅ CRUD de CARs + WFS SEMA — Fase 2</li>
-            <li className="text-slate-400">⏳ WhatsApp Connect (QR Code) — Fase 5</li>
-            <li className="text-slate-400">⏳ Monitoramento SCCON — Fase 3</li>
+            <li className="text-emerald-400">✅ Monitoramento SCCON — Fase 3</li>
             <li className="text-slate-400">⏳ SEMA multicamada (embargos, infrações) — Fase 4</li>
+            <li className="text-slate-400">⏳ WhatsApp Connect (QR Code) — Fase 5</li>
             <li className="text-slate-400">⏳ Deploy Cloudflare + Systemd — Fase 6</li>
           </ul>
         </div>
