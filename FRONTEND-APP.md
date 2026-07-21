@@ -883,14 +883,246 @@ Além do WhatsApp, notificações push no navegador:
 
 ---
 
-## Checklist de features (futuras)
+---
 
-- [ ] Compartilhar relatório via link temporário
-- [ ] Múltiplos usuários por CAR (ex: proprietário + engenheiro)
-- [ ] Alertas por email (fallback se WhatsApp offline)
-- [ ] Integração com calendário (Google Calendar)
-- [ ] App PWA (instalável no celular)
-- [ ] Dark/light mode toggle
-- [ ] Gráfico de tendência (NDVI ao longo do tempo)
-- [ ] Previsão de risco (machine learning: score de probabilidade de desmate)
-- [ ] Marketplace de créditos de carbono (integração futura com CarbonLink)
+# 🆕 Telas novas do cliente (consultor / eng. florestal)
+
+> Estas seções cobrem as funcionalidades adicionadas no plano ampliado (Fases 5–11).
+> Persona: consultor que gerencia **carteiras** de imóveis. Tudo grátis, GIS-first, com IA de apoio.
+
+## A. Carteira / Portfólio (`/dashboard` repensado) 📂
+
+O dashboard deixa de ser "lista de CARs" e vira **gestão de carteira**. Dois modos: **Cards** e **Tabela**.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  👤 Consultor            [🔍 Buscar Ctrl+K]   [+ Importar] [+ CAR]│
+├──────────────────────────────────────────────────────────────────┤
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌────────────┐  │
+│  │🌿 Imóveis│ │📐 Área   │ │🔴 Risco  │ │🔔 Alertas│ │🕐 Último  │  │
+│  │   127    │ │ 84.6k ha│ │ 8 altos │ │   312    │ │ check: 6h  │  │
+│  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └────────────┘  │
+│                                                                  │
+│  Filtros: [Cliente ▼] [Município ▼] [Tag ▼] [Risco ▼] [Status ▼]│
+│  Ver: ( ▦ Cards ) ( ▤ Tabela ) ( 🗺️ Mapa )      Ordenar: Risco ▼ │
+│                                                                  │
+│  ▤ TABELA                                                         │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ ☐ Imóvel        Cliente     Munic.   Área    Risco  Alertas │  │
+│  │ ☐ MT27827/2017  Faz. S.João Cuiabá  2.847ha  🔴 82   3 novos│  │
+│  │ ☐ MT8019/2017   J. Silva    V.Grande  156ha  🟢 12   0      │  │
+│  │ ☐ MT4410/2019   Agro Ltda   Sinop   9.204ha  🟠 54   1      │  │
+│  │ ...                                        [Ações em massa ▾]│  │
+│  └────────────────────────────────────────────────────────────┘  │
+│  Ações em massa: ✔ Verificar · 📥 Exportar · 📄 Relatório · 🏷️ Tag│
+└──────────────────────────────────────────────────────────────────┘
+```
+
+- **Score de risco** (IA) como badge/coluna ordenável — o consultor ataca os piores primeiro.
+- **Pastas por cliente** na lateral; arrastar imóveis entre pastas.
+- **Mapa da carteira**: todos os polígonos num mapa, coloridos por risco; clique → detalhe.
+- **Ações em massa**: verificar, exportar (SHP/CSV), gerar relatório, aplicar tag.
+
+## B. Importação em massa (`/dashboard/import`) 🆕
+
+```
+┌──────────────────────────────────────────────────┐
+│  Importar imóveis                                 │
+│  ( ● Lista de CARs ) ( ○ CSV ) ( ○ Shapefile/KML )│
+│                                                   │
+│  Cole os números (um por linha):                  │
+│  ┌───────────────────────────────────────────┐   │
+│  │ MT27827/2017                              │   │
+│  │ 8019                                       │   │
+│  │ MT4410/2019                               │   │
+│  └───────────────────────────────────────────┘   │
+│  Cliente/pasta: [ Agro Ltda ▼ ]  Tags: [ 2026 ]  │
+│                                                   │
+│  [ Importar 3 imóveis ]                           │
+│  ▓▓▓▓▓▓▓░░░ 2/3 — MT4410/2019 (buscando WFS...)   │
+│  ✅ 2 com polígono · ⚠️ 1 sem polígono (só SCCON) │
+└──────────────────────────────────────────────────┘
+```
+
+- Formatos: **lista colada · CSV · Shapefile(.zip)/KML/GeoJSON** (cria CARs por geometria).
+- Relatório de importação: quais acharam polígono, quais só monitoram por SCCON.
+
+## C. Aba IA na página do CAR (DeepSeek V4 Flash) 🤖
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  🤖 Assistente — MT27827/2017        Score de risco: 🔴 82   │
+│                                                              │
+│  [ Explicar alertas ] [ Resumo do mês ] [ Gerar laudo ]      │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │ Você: esse desmate de 12 ha tem autorização?             ││
+│  │                                                          ││
+│  │ 🤖: Não localizei AUTEX/autorização de desmate vigente   ││
+│  │ sobre o polígono do alerta de 21/07 (12,5 ha, dentro de  ││
+│  │ APP em ~3 ha). Recomendo triagem como "provável irregular"││
+│  │ e verificação em campo. ⚠️ Análise preliminar — consulte  ││
+│  │ o RT.                                    [👍] [👎] [copiar]││
+│  └──────────────────────────────────────────────────────────┘│
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │ Pergunte sobre este imóvel...                     [ ➤ ]  ││
+│  └──────────────────────────────────────────────────────────┘│
+└──────────────────────────────────────────────────────────────┘
+```
+
+- Chat com **streaming**; escopo do imóvel (contexto = camadas + alertas + NDVI + autorizações).
+- Botões rápidos: **explicar alerta**, **resumo do mês**, **gerar laudo** (abre o editor).
+- No dashboard: widget **"Pergunte sobre sua carteira"** (escopo portfólio).
+- Ver contrato/arquitetura em **[IA-ASSISTENTE.md](./IA-ASSISTENTE.md)**.
+
+## D. Workflow de alertas (aba Alertas turbinada) 🔬
+
+Cada alerta ganha **ciclo de vida** e ferramentas de triagem do consultor:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ 🔴 21/07/2026 — Corte Raso — 12,5 ha — dentro de APP (3 ha)  │
+│ Status: [ Novo ▼ ]  Severidade: 🔴 Alta  •  🤖 provável irreg.│
+│ Fonte: SCCON #458932 · sem AUTEX vigente                     │
+│                                                              │
+│ 📝 Notas: _______________________________  [+ anexar foto]   │
+│ 👤 Responsável: [ Eu ▼ ]                                     │
+│ [🗺️ Ver no mapa] [🤖 Triagem IA] [📥 GeoJSON] [📋 coords]   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- **Status**: novo → em análise → validado → falso positivo → resolvido.
+- **Severidade automática** (classe × área × recência × sobreposição APP/ARL).
+- **Cruzamento com autorizações**: mostra se há AUTEX vigente sobre o alerta.
+- **Notas + anexos + fotos de campo**, atribuição de responsável.
+- **Triagem IA** sugere status; o consultor confirma.
+- Filtros avançados + **saved views** ("meus críticos", "sem AUTEX", "não resolvidos").
+
+## E. Exports GIS e interoperabilidade 📥
+
+- Dropdown **📥 Baixar** em imóvel, alertas e camadas: **SHP(.zip) · GeoJSON · KML/KMZ · GPKG · CSV**.
+- Exportar **todas as camadas do CAR** (ATP/ARL/APP/AUAS/…) num pacote.
+- **API Key** no perfil → usar em QGIS/ArcGIS/scripts; link **"abrir no QGIS"** (WMS/WFS próprio).
+- **Webhooks**: dispara quando surge alerta (config no perfil).
+
+## F. Notificações multicanal (config) 🔔
+
+```
+┌──────────────────────────────────────────────────┐
+│  Notificações                                     │
+│  Canais:  ☑ WhatsApp  ☑ Email  ☐ Telegram  ☑ Push │
+│  Modo:    ( ○ Imediato ) ( ● Resumo diário )      │
+│  Horário silencioso: 22:00 → 06:00                │
+│                                                   │
+│  Por classe:  ☑ Corte raso (imediato)             │
+│               ☑ Embargo/Auto (imediato)           │
+│               ☐ Queimada (resumo)                 │
+│  Severidade mínima: [ Média ▼ ]                   │
+│                                                   │
+│  Destinatários extras (cópia ao cliente final):   │
+│  [+ WhatsApp] [+ Email]                            │
+└──────────────────────────────────────────────────┘
+```
+
+- **Digest diário/semanal** da carteira (e-mail HTML) além de alertas imediatos.
+- **Destinatários extras**: consultor adiciona o contato do cliente final para receber cópia.
+
+## G. Modo Campo (mobile / PWA) 📱
+
+- **PWA instalável** + cache offline da carteira.
+- **"Estou aqui"**: GPS marca a posição no mapa do imóvel (conferir alerta em campo).
+- **Foto geolocalizada**: tira foto no local e anexa ao CAR/alerta (vira anexo do parecer).
+- Bottom nav no mobile; busca global (Ctrl/Cmd+K).
+
+## H. Editor de Laudo (`/dashboard/cars/:id/laudo`) 📄
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Laudo técnico — MT27827/2017         [🤖 Gerar minuta] [PDF] │
+│  ┌──────────────┬───────────────────────────────────────────┐ │
+│  │ Blocos       │  1. Identificação do imóvel                │ │
+│  │ ▸ Introdução │  CAR MT27827/2017, Cuiabá-MT, 2.847,32 ha  │ │
+│  │ ▸ Identif.   │  ...                                       │ │
+│  │ ▸ Análise    │  [ inserir mapa ] [ inserir NDVI ]         │ │
+│  │ ▸ Conformid. │                                            │ │
+│  │ ▸ Conclusão  │  (texto editável, gerado pela IA)          │ │
+│  │ ▸ Recomend.  │                                            │ │
+│  └──────────────┴───────────────────────────────────────────┘ │
+│  Rodapé/marca do consultor: [ logo ]   RT: _______  ART: ____ │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- IA gera a minuta (contexto completo) → consultor edita blocos → insere mapa/NDVI → exporta PDF.
+- **Marca própria** (logo/rodapé) mesmo sem white-label pago.
+
+## I. Camadas SEMA no navegador (viewer) 🗺️
+
+Qualquer das **135 camadas WFS/WMS** da SEMA (ver [CAMADAS-SEMA.md](./CAMADAS-SEMA.md)) desenhada ao vivo
+sobre o mapa do imóvel — sem sair do AlertaCAR, sem abrir o Geoportal da SEMA.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  🗺️ Mapa — MT27827/2017            [🔎 buscar camada...]     │
+│  ┌──────────────┬───────────────────────────────────────────┐ │
+│  │ CAMADAS      │                                            │ │
+│  │ Base:        │            MAPA LEAFLET                    │ │
+│  │ ◉ Sentinel24 │      (polígono do CAR + overlays)          │ │
+│  │ ○ OSM        │                                            │ │
+│  │ ○ Relevo DEM │        🟩 CAR ▓ embargo ░ TI               │ │
+│  │              │                                            │ │
+│  │ Overlays:    │                                            │ │
+│  │ ☑ CAR (ATP)  │                                            │ │
+│  │ ☑ Embargos   │  opac. ████████░░ 80%                      │ │
+│  │ ☐ Autos infr.│                                            │ │
+│  │ ☑ TI / UC    │                                            │ │
+│  │ ☐ Licenças   │                                            │ │
+│  │ ☐ Autorizaç. │                                            │ │
+│  │ ☐ Hidrografia│                                            │ │
+│  │ ☐ Desmate hist│  [📸 Snapshot p/ laudo]  [+ mais camadas ▾]│ │
+│  └──────────────┴───────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- Lista de camadas vem de **`/api/map/capabilities`** (classificada em satélite / vetor / CAR).
+- Cada overlay é um **`WMSTileLayer`** apontando para o WMS da SEMA (`GetMap` + `authkey`), com **opacidade**.
+- **Base layer** = mosaico de satélite (Sentinel-2/Landsat/CBERS-4A) ou OSM/relevo.
+- **📸 Snapshot**: `POST /api/cars/:id/map/snapshot` gera PNG (base + overlays + bbox) para inserir no laudo.
+- Interseção "quantos ha do CAR estão embargados / em TI" via `POST /api/map/intersection-hectares`.
+
+## J. Ferramentas GIS de conformidade (aba Ferramentas) 🧰
+
+Reúso do GeoForest — valida e processa shapefiles do CAR direto no app (padrão upload → SSE → ZIP):
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  🧰 Ferramentas          Arraste um ZIP (.shp+.dbf+.prj) aqui │
+│                                                              │
+│  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐        │
+│  │ ✔ Validar     │ │ ◈ Vértices    │ │ ▣ Áreas não   │        │
+│  │  geometria    │ │  próximas     │ │  contidas     │        │
+│  │ borda cruza,  │ │ pares coincid.│ │ alvo − contin.│        │
+│  │ pts repetidos │ │               │ │               │        │
+│  └───────────────┘ └───────────────┘ └───────────────┘        │
+│  ┌───────────────┐ ┌───────────────┐                          │
+│  │ ⚙ ProcessarGeo│ │ ✂ Recortar    │   Resultado → anexa ao   │
+│  │ APP/APPD/ARL  │ │  camadas CAR  │   CAR da carteira        │
+│  └───────────────┘ └───────────────┘                          │
+│                                                              │
+│  ▓▓▓▓▓▓▓░░░ Processando... 2 bordas se cruzam, 1 ponto rep.  │
+│  [📥 Baixar erros (ZIP)]  [📄 Gerar laudo de conformidade]    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- Ferramentas: **validação de geometria · vértices próximas · áreas não contidas · ProcessarGeo · recorte de camadas**.
+- Resultado vincula ao imóvel da carteira (anexa relatório de erros / laudo ao CAR).
+
+---
+
+## Checklist de features (futuras / backlog)
+
+- [ ] Múltiplos usuários por CAR com papéis (dono/editor/leitor) + convites
+- [ ] Integração com calendário (prazos de licença/embargo)
+- [ ] Detecção de mudança por ML próprio (além do diff NDVI)
+- [ ] Créditos de carbono (integração futura com CarbonLink)
+- [ ] i18n completo (EN/ES)
+- [ ] 2FA para admin (TOTP)
