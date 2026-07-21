@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import db from '../db/connection.js'
 import { buildCarContext, buildPortfolioContext, hashAiContext, type CarAiContext } from '../services/ai-context.js'
-import { AiUnavailableError, completeAi, isAiConfigured, type AiMessage } from '../services/ai.js'
+import { AiUnavailableError, completeAi, isAiConfigured, streamAi, type AiMessage } from '../services/ai.js'
 import { calculateRiskScore, deterministicRiskExplanation } from '../services/risk-score.js'
 
 const router = Router()
@@ -123,6 +123,62 @@ router.post('/ai/chat', async (req: AuthRequest, res) => {
   } catch (error) { handleError(res, error) }
 })
 
+// POST /api/ai/chat/stream — mesma conversa persistida, com resposta SSE incremental.
+router.post('/ai/chat/stream', async (req: AuthRequest, res) => {
+  const userId = req.user!.id
+  const message = String(req.body?.message || '').trim()
+  const scope = req.body?.scope === 'portfolio' ? 'portfolio' : 'car'
+  if (message.length < 2 || message.length > 2_000) return void res.status(400).json({ error: 'Mensagem deve ter entre 2 e 2000 caracteres' })
+  const carId = scope === 'car' ? String(req.body?.carId || '') : null
+  const context = scope === 'car' ? buildCarContext(carId!, userId) : buildPortfolioContext(userId)
+  if (!context || (scope === 'car' && !carId)) return void res.status(404).json({ error: 'CAR não encontrado' })
+
+  try {
+    const thread = getOrCreateThread(String(req.body?.threadId || ''), userId, scope, carId)
+    db.prepare('INSERT INTO ai_messages (id, thread_id, role, content) VALUES (?, ?, ?, ?)').run(uuid(), thread.id, 'user', message)
+    const previous = db.prepare('SELECT role, content FROM ai_messages WHERE thread_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 8').all(thread.id) as Array<{ role: 'user' | 'assistant'; content: string }>
+    const cacheKey = hashAiContext({ context, message, previous })
+    const messages: AiMessage[] = [
+      { role: 'system', content: systemPrompt('Responda com objetividade à pergunta do consultor usando apenas o contexto fornecido e deixe claras as incertezas.') },
+      { role: 'user', content: `Contexto ambiental:\n${JSON.stringify(context)}\n\nHistórico recente:\n${JSON.stringify(previous.reverse())}\n\nPergunta: ${message}` },
+    ]
+
+    res.status(200).set({
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    })
+    res.flushHeaders()
+
+    const cached = db.prepare('SELECT content FROM ai_cache WHERE cache_key = ? AND user_id = ?').get(cacheKey, userId) as { content: string } | undefined
+    let content = ''
+    if (cached) {
+      content = cached.content
+      sendSse(res, { type: 'delta', content: withDisclaimer(content) })
+    } else {
+      enforceRateLimit(userId)
+      for await (const event of streamAi(messages, 700)) {
+        if (event.type !== 'delta') continue
+        content += event.content
+        sendSse(res, event)
+      }
+      db.prepare('INSERT OR REPLACE INTO ai_cache (cache_key, user_id, kind, content) VALUES (?, ?, ?, ?)').run(cacheKey, userId, `chat:${thread.id}`, content)
+    }
+    const finalContent = withDisclaimer(content)
+    const disclaimerSuffix = finalContent.slice(content.length)
+    if (disclaimerSuffix) sendSse(res, { type: 'delta', content: disclaimerSuffix })
+    db.prepare('INSERT INTO ai_messages (id, thread_id, role, content) VALUES (?, ?, ?, ?)').run(uuid(), thread.id, 'assistant', finalContent)
+    db.prepare("UPDATE ai_threads SET updated_at = datetime('now'), title = COALESCE(title, ?) WHERE id = ?").run(message.slice(0, 100), thread.id)
+    sendSse(res, { type: 'done', threadId: thread.id, cached: Boolean(cached) })
+  } catch (error) {
+    if (!res.headersSent) return void handleError(res, error)
+    sendSse(res, { type: 'error', error: safeError(error) })
+  } finally {
+    if (!res.writableEnded) res.end()
+  }
+})
+
 router.post('/ai/portfolio-digest', async (req: AuthRequest, res) => {
   const context = buildPortfolioContext(req.user!.id)
   try {
@@ -189,6 +245,10 @@ function handleError(res: any, error: unknown) {
   const status = (error as any)?.statusCode || (error instanceof AiUnavailableError ? 503 : 500)
   if (status >= 500) console.error('[ai] request error:', safeError(error))
   res.status(status).json({ error: safeError(error) })
+}
+
+function sendSse(res: any, payload: Record<string, unknown>) {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`)
 }
 
 export default router

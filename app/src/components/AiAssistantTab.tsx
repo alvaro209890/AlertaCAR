@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { apiFetch } from '../lib/api'
+import { apiFetch, apiStream } from '../lib/api'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 type Risk = { score: number; band: string; explanation: string; cached: boolean }
@@ -42,15 +42,18 @@ export default function AiAssistantTab({ carId }: { carId: string }) {
     const message = question.trim()
     if (!message || loadingAction) return
     setQuestion('')
-    setMessages((current) => [...current, { role: 'user', content: message }])
+    setMessages((current) => [...current, { role: 'user', content: message }, { role: 'assistant', content: '' }])
     setLoadingAction('chat')
-    const response = await apiFetch('/ai/chat', { method: 'POST', body: JSON.stringify({ scope: 'car', carId, threadId, message }) })
+    const response = await apiStream('/ai/chat/stream', { method: 'POST', body: JSON.stringify({ scope: 'car', carId, threadId, message }) }, (event) => {
+      if (event.type !== 'delta' || typeof event.content !== 'string') return
+      setMessages((current) => current.map((item, index) => index === current.length - 1 ? { ...item, content: item.content + event.content } : item))
+    })
     setLoadingAction(null)
-    if (response.message?.content) {
+    if (typeof response.threadId === 'string') {
       setThreadId(response.threadId)
-      setMessages((current) => [...current, response.message])
     } else {
-      toast.error(response.error || 'Não foi possível responder')
+      setMessages((current) => current.slice(0, -1))
+      toast.error(typeof response.error === 'string' ? response.error : 'Não foi possível responder')
     }
   }
 

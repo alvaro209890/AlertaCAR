@@ -262,7 +262,7 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 > Detalhes de arquitetura, prompts e endpoints em **[IA-ASSISTENTE.md](./IA-ASSISTENTE.md)**.
 
 ### 7.1 Fundação de IA
-- [x] `services/ai.ts` — cliente DeepSeek (base URL, chave, timeout e retry; streaming SSE ainda pendente)
+- [x] `services/ai.ts` — cliente DeepSeek (base URL, chave, timeout, retry e streaming SSE)
 - [x] `services/ai-context.ts` — **context builder**: monta contexto do CAR (dados cadastrais + camadas + alertas + sobreposições + autorizações + NDVI) em JSON compacto, sem PII do cliente
 - [ ] **RAG jurídico-ambiental**: portar `GeoForest/backend/knowledge-base.ts` + `banco_de_dados/` (29 arquivos: Código Florestal, SNUC, Código Ambiental MT, APP/RL/PMFS, matrizes de decisão) para aterrar recomendações e implicações legais — carregar só docs relevantes por pergunta
 - [x] Guardrails + disclaimer obrigatório ("análise preliminar, consulte o RT")
@@ -271,7 +271,7 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 ### 7.2 Assistente conversacional
 - [x] `POST /api/ai/chat` — chat por CAR ("o que aconteceu esse mês?", "esse alerta é grave?", "tem autorização?")
 - [ ] Chat de **carteira** ("quais imóveis têm mais risco?", "resuma a semana de todos os clientes")
-- [ ] Threads persistentes (`ai_threads` / `ai_messages`) e streaming SSE no front (threads já persistem; SSE ainda pendente)
+- [x] Threads persistentes (`ai_threads` / `ai_messages`) e streaming SSE no front
 
 ### 7.3 Inteligência sobre os dados
 - [x] `GET /api/cars/:id/risk-score` — **score 0–100** determinístico + explicação (histórico, tendência NDVI, sobreposições e conformidade disponíveis)
