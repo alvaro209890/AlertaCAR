@@ -311,7 +311,7 @@ O consultor não tem 1 imóvel: tem uma **carteira**. Toda a navegação assume 
 ### 8.3 Visão consolidada
 - [ ] **Tabela da carteira**: colunas ordenáveis (cliente, município, área, nº alertas, score de risco, último check), filtros, busca, paginação
 - [ ] **Mapa geral da carteira**: todos os polígonos, coloridos por status/risco, clique → detalhe
-- [ ] **Ranking de risco**: imóveis que precisam de atenção primeiro
+- [x] **Ranking de risco**: imóveis que precisam de atenção primeiro
 - [ ] **Dashboard analítico**: total ha monitorados, ha desmatados no período, alertas por classe/município, tendência (Recharts)
 - [ ] Ações em massa: verificar selecionados, exportar selecionados, gerar relatório da carteira
 

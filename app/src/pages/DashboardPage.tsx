@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('')
   const [clientFilter, setClientFilter] = useState('')
   const [tagFilter, setTagFilter] = useState('')
+  const [sortBy, setSortBy] = useState<'recent' | 'risk' | 'area'>('recent')
 
   const loadCars = () => {
     apiFetch('/cars').then(async r => {
@@ -86,6 +87,12 @@ export default function DashboardPage() {
     const matchesText = !normalizedSearch || [car.nickname, car.carNumber, car.municipality, car.client?.name, ...car.tags.map((tag) => tag.name)].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR').includes(normalizedSearch)
     return matchesText && (!clientFilter || car.client?.id === clientFilter) && (!tagFilter || car.tags.some((tag) => tag.id === tagFilter))
   })
+  const visibleCars = [...filteredCars].sort((a, b) => {
+    if (sortBy === 'risk') return (riskByCar[b.id]?.score || 0) - (riskByCar[a.id]?.score || 0)
+    if (sortBy === 'area') return (b.areaHa || 0) - (a.areaHa || 0)
+    return b.createdAt.localeCompare(a.createdAt)
+  })
+  const riskRanking = [...cars].filter((car) => riskByCar[car.id]).sort((a, b) => riskByCar[b.id].score - riskByCar[a.id].score).slice(0, 5)
 
   return (
     <div className="min-h-screen p-6">
@@ -122,6 +129,19 @@ export default function DashboardPage() {
               ))}
             </div>
             <PortfolioAssistant />
+            {riskRanking.length > 0 && (
+              <section className="mb-6 border-y border-white/5 py-4">
+                <h2 className="mb-3 text-sm font-semibold text-slate-300">Prioridade por risco</h2>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  {riskRanking.map((car, index) => (
+                    <button key={car.id} className="min-w-0 border-l-2 px-3 py-1 text-left hover:bg-white/5" style={{ borderColor: riskByCar[car.id].band === 'critico' ? '#f87171' : riskByCar[car.id].band === 'alto' ? '#fb923c' : riskByCar[car.id].band === 'medio' ? '#facc15' : '#34d399' }} onClick={() => setLocation(`/dashboard/cars/${car.id}`)}>
+                      <p className="truncate text-xs text-slate-400">{index + 1}. {car.nickname || car.carNumber}</p>
+                      <p className="text-sm font-semibold">Risco {riskByCar[car.id].score}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
           </>
         )}
 
@@ -179,7 +199,7 @@ export default function DashboardPage() {
                 + Adicionar
               </button>
             </div>
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
               <input className="input-field py-2" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar CAR, cliente, tag ou município" />
               <select className="input-field w-auto py-2" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
                 <option value="">Todos os clientes</option>
@@ -189,9 +209,14 @@ export default function DashboardPage() {
                 <option value="">Todas as tags</option>
                 {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
               </select>
+              <select className="input-field w-auto py-2" value={sortBy} onChange={(event) => setSortBy(event.target.value as 'recent' | 'risk' | 'area')}>
+                <option value="recent">Mais recentes</option>
+                <option value="risk">Maior risco</option>
+                <option value="area">Maior área</option>
+              </select>
             </div>
-            <p className="text-sm text-slate-500">{filteredCars.length} de {cars.length} {cars.length === 1 ? 'imóvel' : 'imóveis'}</p>
-            {filteredCars.map(car => (
+            <p className="text-sm text-slate-500">{visibleCars.length} de {cars.length} {cars.length === 1 ? 'imóvel' : 'imóveis'}</p>
+            {visibleCars.map(car => (
               <div
                 key={car.id}
                 className="glass-card p-5 hover:bg-slate-800/30 transition-colors group cursor-pointer"
@@ -275,7 +300,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))}
-            {filteredCars.length === 0 && <div className="glass-card p-8 text-center text-slate-400">Nenhum imóvel corresponde aos filtros.</div>}
+            {visibleCars.length === 0 && <div className="glass-card p-8 text-center text-slate-400">Nenhum imóvel corresponde aos filtros.</div>}
           </div>
         )}
       </div>
