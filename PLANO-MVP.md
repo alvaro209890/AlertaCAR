@@ -56,7 +56,7 @@ workflow de triagem de alertas, e IA que resume, pontua risco e minuta pareceres
 | **9** | **Relatórios + Exportações + Interoperabilidade GIS** | ✅ backend pronto (21/07) | 3 |
 | **10** | **Notificações multicanal + WhatsApp** | 18 itens | 2-3 |
 | **11** | **Plataforma / UX / Modo Campo (mobile)** | 20 itens | 2-3 |
-| **12** | **Admin avançado + Segurança + Deploy + Backup** | 20 itens | 2 |
+| **12** | **Admin avançado + Segurança + Deploy + Backup** | 12.3 (deploy) ✅ (21/07); resto pendente | 2 |
 | **13** | **Ferramentas GIS de conformidade** (reúso GeoForest) | ✅ backend (21/07) | 3 |
 
 **Total estimado do novo escopo: ~28-33 dias** para a plataforma completa e polida.
@@ -443,11 +443,29 @@ Nova página `/dashboard/carteira` (link "📂 Carteira" no dashboard), 3 abas:
 - [ ] Log de auditoria (quem fez o quê, quando)
 - [ ] Nunca commitar segredos; `JWT_SECRET` via `openssl rand -hex 64`
 
-### 12.3 Deploy
-- [ ] `alertacar-backend.service` (systemd user, Restart=always, porta 3002)
-- [ ] Cloudflare Tunnel: `alertacar` / `alertacar-admin` / `alertacar-api` `.cursar.space`
-- [ ] Script build (app+admin+backend) → restart → smoke test
-- [ ] **Backup diário** do banco (`.db`) fora do repo
+### 12.3 Deploy ✅ (21/07/2026)
+- [x] `alertacar-backend.service` (systemd user, Restart=always, porta 3002) — rodando
+- [x] Cloudflare Tunnel dedicado `alertacar` (`cb4189a3-4b61-4520-8eb9-ab1c937b431f`),
+  `alertacar-cloudflared.service` — os 3 domínios respondem: `alertacar.cursar.space` (app),
+  `alertacar-admin.cursar.space` (admin), `alertacar-api.cursar.space` (API)
+- [x] **Fix real encontrado no deploy**: o servidor só servia o admin via prefixo `/admin` no
+  mesmo domínio — visitar `alertacar-admin.cursar.space/` mostraria o app do cliente (path `/`
+  não bate com `startsWith('/admin')`). Corrigido com reescrita de URL por hostname
+  (`config.adminHostname`) antes do static/fallback — validado ao vivo nos 2 modos
+- [x] **Desvio do plano**: em vez de buildar "in place" no checkout de trabalho (onde este
+  Claude e outros agentes seguem editando/testando), o deploy roda a partir de um **worktree git
+  dedicado e somente-leitura** em `AlertaCAR-run/` (`git worktree add --detach <commit testado>`)
+  — evita builds de produção pegarem código não commitado/não testado por acidente. Redeploy =
+  `cd AlertaCAR-run && git checkout <novo commit> && rebuild → restart` (substitui o "Pipeline de
+  Build + Deploy" original, que assumia checkout único)
+- [x] `pnpm-workspace.yaml` de `app/`, `admin/` e `backend/` corrigidos (faltava `packages:`,
+  chave `allowBuilds` não existe mais no pnpm atual — sem isso `pnpm install`/`build` falhava)
+- [x] Script de build (app+admin+backend) → restart → smoke test — rodado manualmente; falta
+  automatizar num script versionado
+- [x] **Backup diário** do banco — `alertacar-backup.timer`/`.service` (systemd user, 05:00,
+  retenção 30 dias) em `Banco_de_dados/AlertaCAR/backups/`, fora do repo
+- [ ] `DEEPSEEK_API_KEY` não configurada em produção ainda — recursos de IA (Fase 7) ficam
+  indisponíveis até a chave ser adicionada em `/home/server/.config/alertacar/backend.env`
 
 ---
 
