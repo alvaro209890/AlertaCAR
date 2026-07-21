@@ -3,6 +3,7 @@ import { useLocation } from 'wouter'
 import { useAuth } from '../lib/auth'
 import { apiFetch } from '../lib/api'
 import type { Car } from '../lib/types'
+import PortfolioAssistant from '../components/PortfolioAssistant'
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
@@ -89,21 +90,24 @@ export default function DashboardPage() {
         </div>
 
         {cars.length > 0 && (
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            {[
-              { label: 'CARs Ativos', value: cars.length, icon: '🌿' },
-              { label: 'Área Total', value: `${totalArea.toLocaleString('pt-BR')} ha`, icon: '📐' },
-              { label: 'Alertas', value: totalAlerts, icon: '🔔' },
-            ].map(s => (
-              <div key={s.label} className="glass-card p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg">{s.icon}</span>
-                  <span className="text-sm text-slate-400">{s.label}</span>
+          <>
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              {[
+                { label: 'CARs Ativos', value: cars.length, icon: '🌿' },
+                { label: 'Área Total', value: `${totalArea.toLocaleString('pt-BR')} ha`, icon: '📐' },
+                { label: 'Alertas', value: totalAlerts, icon: '🔔' },
+              ].map(s => (
+                <div key={s.label} className="glass-card p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">{s.icon}</span>
+                    <span className="text-sm text-slate-400">{s.label}</span>
+                  </div>
+                  <p className="text-xl font-bold">{s.value}</p>
                 </div>
-                <p className="text-xl font-bold">{s.value}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <PortfolioAssistant />
+          </>
         )}
 
         {addMsg && (

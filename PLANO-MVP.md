@@ -270,7 +270,7 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 
 ### 7.2 Assistente conversacional
 - [x] `POST /api/ai/chat` — chat por CAR ("o que aconteceu esse mês?", "esse alerta é grave?", "tem autorização?")
-- [ ] Chat de **carteira** ("quais imóveis têm mais risco?", "resuma a semana de todos os clientes")
+- [x] Chat de **carteira** ("quais imóveis têm mais risco?", "resuma a semana de todos os clientes")
 - [x] Threads persistentes (`ai_threads` / `ai_messages`) e streaming SSE no front
 
 ### 7.3 Inteligência sobre os dados
@@ -287,7 +287,7 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 
 ### 7.5 UX de IA no app
 - [x] Aba **IA** na página do CAR (chat + score + botões de resumo, próximos passos e minuta de laudo)
-- [ ] Widget "Pergunte sobre sua carteira" no dashboard
+- [x] Widget "Pergunte sobre sua carteira" no dashboard
 - [ ] Badge de score de risco nos cards e na tabela da carteira
 
 ---
