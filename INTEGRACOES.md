@@ -1,168 +1,199 @@
 # Integrações — AlertaCAR
 
-## 1. WFS da SEMA-MT
-
-### Objetivo
-Buscar o polígono oficial do CAR registrado na SEMA-MT. Esse polígono é usado para consultar a SCCON e também exibido no mapa do dashboard.
-
-### URL Base
-```
-https://geoportal.sema.mt.gov.br/geoserver/SEMA/ows
-```
-
-### Método
-WFS `GetFeature` 1.1.0. O GeoServer da SEMA tem várias camadas de CAR. A camada principal usada no GeoForest:
-
-```
-SEMA:limite_car_requerido
-```
-
-### Parâmetros da requisição
-
-```
-service=WFS
-version=1.1.0
-request=GetFeature
-typeName=SEMA:limite_car_requerido
-srsName=EPSG:4674
-outputFormat=application/json
-CQL_FILTER=cod_imovel='XXXXXXXXXX'
-```
-
-Onde `cod_imovel` é derivado do número do CAR.
-
-### Pitfalls conhecidos (do GeoForest)
-
-1. **INTERSECTS não é confiável**: Retorna subconjunto de features sem erro. Usar sempre `CQL_FILTER` por `cod_imovel` quando possível, ou BBOX.
-
-2. **Paginação quebrada**: `startIndex` causa timeout. O GeoServer declara `PagingIsTransactionSafe=FALSE`. Fazer requisição única sem paginação.
-
-3. **Timeout frequente**: O GeoServer da SEMA é lento. Implementar retry (3 tentativas) com backoff exponencial.
-
-4. **SRID**: As features vêm em EPSG:4674 (SIRGAS 2000). Converter para EPSG:4326 (WGS84) via proj4js se necessário.
-
-### Cache
-
-- Polígono cacheado no SQLite por 30 dias
-- Se falhar a consulta, mantém cache antigo (não invalida)
-- Check manual via botão "Forçar verificação"
-
-### Código de referência (GeoForest)
-
-O GeoForest implementa essa integração em `backend/simcar-clip.ts` e `backend/wfs-intersection.ts`. Reutilizar a lógica de fetch WFS com fallback de timeout.
+> ✅ Todas as integrações testadas em 21/07/2026. Dados reais, endpoints funcionais.
 
 ---
 
-## 2. SCCON (AUAS)
+## 1. WFS da SEMA-MT
 
-### Objetivo
-Detectar alertas de desmatamento e degradação emitidos pela SCCON (Sistema de Comercialização e Controle de Produtos de Origem Florestal) para os polígonos monitorados.
+### Credenciais
 
-### O que é AUAS
-AUAS = Análise Unificada de Alertas SCCON. É o método que o GeoForest usa/planeja usar para cruzar dados de alertas com os polígonos do CAR. A SCCON disponibiliza camadas WMS/WFS com alertas de desmatamento (PRODES, DETER) e degradação.
+| Campo | Valor |
+|-------|-------|
+| URL Base | `https://geo.sema.mt.gov.br/geoserver/ows` |
+| Auth Key | `541085de-9a2e-454e-bdba-eb3d57a2f492` |
+| Total camadas | 135 |
+| Timeout típico | 10-30s |
 
-### Método (a confirmar na implementação)
+### Camadas relevantes para AlertaCAR
 
-Possíveis abordagens:
-1. **WFS SCCON**: Se a SCCON tiver endpoint WFS público, consultar por BBOX do polígono do CAR
-2. **API REST**: Se existir API REST da SCCON para consulta por coordenadas
-3. **Download + clip local**: Baixar shapefiles de alertas e clipar localmente com Turf.js
+#### 🔴 Camadas de CAR (todas com `NUMERO_CAR`)
 
-A definir durante a Fase 3, reutilizando o conhecimento do GeoForest (AUAS×SCCON).
+| Camada | Descrição | Útil para |
+|--------|-----------|-----------|
+| `Geoportal:CAR_ATP` | Área Total do Imóvel (polígono principal) | Polígono base do CAR |
+| `Geoportal:CAR_AUAS` | Área de Uso Antrópico do Solo | Datação de desmate (coluna `ABERTURA`) |
+| `Geoportal:CAR_AVN` | Área de Vegetação Nativa | Monitorar perda de vegetação |
+| `Geoportal:CAR_ARL` | Área de Reserva Legal | Conformidade legal |
+| `Geoportal:CAR_APP` | Área de Preservação Permanente | Conformidade ambiental |
+| `Geoportal:CAR_APPD` | APP Degradada | Recuperação necessária |
+| `Geoportal:CAR_APPRL` | APP em RL | Compensação |
+| `Geoportal:CAR_AU` | Área Úmida | Restrições |
+| `Geoportal:CAR_NASCENTE` | Nascentes (pontos) | Restrições |
 
-### Dados extraídos de cada alerta
+#### 🟠 Camadas de Embargo e Fiscalização
 
-| Campo | Descrição | Exemplo |
-|-------|-----------|---------|
-| `id` | Identificador único do alerta | `DETER_2026_07_12345` |
-| `type` | Tipo do alerta | `desmatamento` / `degradacao` |
-| `date` | Data da detecção | `2026-07-15` |
-| `area_ha` | Área detectada (hectares) | `12.5` |
-| `system` | Sistema de origem | `DETER` / `PRODES` |
+| Camada | Descrição |
+|--------|-----------|
+| `Geoportal:TDAD_FISCALIZACAO_TERMO_DE_EMBARGO` | **Embargos ativos** — polígonos ⭐ |
+| `Geoportal:TDAD_FISCALIZACAO_AUTO_DE_INFRACAO` | Autos de infração |
+| `Geoportal:TDAD_FISCALIZACAO_NOTIFICACAO` | Notificações |
+| `Geoportal:TDAD_FISCALIZACAO` | Fiscalizações gerais |
 
-### Detecção de novidade
+#### 🟡 Desmatamento Autorizado
 
-- Salvar `id` do alerta SCCON na tabela `alerts`
-- Na próxima consulta, comparar IDs — só criar registro se for novo
-- Isso evita notificar o mesmo alerta duas vezes
+| Camada | Descrição |
+|--------|-----------|
+| `Geoportal:AUTORIZACAO_DESMATE_SEMA` | Autorizações de desmate emitidas |
+| `Geoportal:AUTORIZACAO_EXPLORACAO_SEMA` | Autorizações de exploração |
+| `Geoportal:DESMATAMENTO_SEMA_2012` a `_2018` | Desmatamento histórico |
 
-### Frequência
+### Método de busca
 
-- Cron diário às 06:00 (horário de Brasília)
-- Forçar verificação manual via botão no dashboard
+**CQL_FILTER via `NUMERO_CAR`:**
+```
+typeName=Geoportal:CAR_ATP
+CQL_FILTER=NUMERO_CAR='MT27827/2017'
+```
+
+Formato do número: `MT<digitos>/<ano>` (ex: `MT27827/2017`).
+
+**Para busca por número simplificado** (ex: `271442`):
+1. Tentar formatos: `MT271442/YYYY`, `MT0271442/YYYY`
+2. Se falhar, buscar via API SIMCAR (REST) que converte número simplificado → completo
+3. Fallback: usar `maxFeatures` maior + filtrar no cliente
+
+### Pitfalls conhecidos (GeoForest)
+
+1. **INTERSECTS não confiável** — retorna subconjunto sem erro. Sempre usar CQL_FILTER ou BBOX.
+2. **Paginação quebrada** — `startIndex` causa timeout. Fazer requisição única.
+3. **Timeout frequente** — implementar retry com backoff exponencial (3 tentativas, 30s cada).
+4. **Cache agressivo** — polígono não muda com frequência. Cache de 30 dias.
+
+---
+
+## 2. SCCON (Sistema de Comercialização e Controle de Produtos de Origem Florestal)
+
+### ✅ Testado e Funcional
+
+### Endpoints
+
+| Serviço | URL | Método |
+|---------|-----|--------|
+| Token público | `https://plataforma.sccon.com.br/gama-api/auth/token-public-layer?organizationUUID=597953b9-ee78-4113-80f9-803dbbaa60a0` | GET |
+| User info | `https://plataforma-alertas.sccon.com.br/gama-api/users/user` | GET (Bearer) |
+| WFS Alertas | `https://geoserver-dashboard-mt.sccon.com.br/geoserver/dashboards/wfs` | GET (Bearer) |
+| Detalhe alerta | `https://deforestation-data-mt.sccon.com.br/api-v2/localAlerts/{id}` | GET (Bearer) |
+
+### Fluxo de consulta
+
+```
+1. GET token público (JWT, ~24h validade)
+2. GET userId (precisa do token)
+3. Montar viewparams com userId + orgToken + classes + datas
+4. WFS GetFeature no bbox do CAR → retorna ids (idt_local_alert)
+5. GET /localAlerts/{id} em paralelo → classType, alertDetectedDate, geometry (Polygon)
+6. Spatial join: quais alertas intersectam o polígono do CAR?
+```
+
+### Formato dos dados
+
+**WFS** (camada `dashboards:vw_v2_dashboard_alerts_all_defo-data_prod-mt`):
+```json
+{
+  "idt_local_alert": 1470111,
+  "qualification": "...",
+  "area_m2": 12345.67,
+  "area_ha": 1.23,
+  "area_ha_tx": "1.23"
+}
+```
+
+**Detalhe** (`/localAlerts/{id}`):
+```json
+{
+  "alert": {
+    "classType": "CUT",
+    "alertDetectedDate": "2019-12-27T13:04:09",
+    "geometry": { "type": "Polygon", "coordinates": [...] },
+    "areaHa": 12.5,
+    "city": "Cuiabá",
+    "state": "MT"
+  }
+}
+```
+
+### Classes de alerta
+
+| Classe | Descrição | Prioridade |
+|--------|-----------|------------|
+| `CUT` | Corte raso (desmatamento total) | 🔴 Alta |
+| `SELECTIVE_EXTRACTION` | Extração seletiva | 🟠 Média |
+| `DEGRADATION_SELECTIVE_CUT` | Degradação por corte seletivo | 🟠 Média |
+| `BURN_SCAR` | Cicatriz de queimada | 🟡 Baixa |
+| `MINERAL_EXTRACTION` | Extração mineral | 🔴 Alta |
+| `DEGRADATION_CHEMICAL_AGENT` | Degradação química | 🔴 Alta |
+| `FOCUS_OF_BURN` | Foco de calor | 🟡 Baixa |
+| `LANDSLIDES` | Deslizamentos | 🟡 Baixa |
+| `BLOW_DOWN` | Derrubada por vento | 🟡 Baixa |
+
+### Parâmetros do viewparams
+
+```
+viewparams=
+  userToken:'{userId}';
+  orgToken:'597953b9-ee78-4113-80f9-803dbbaa60a0';
+  fromDate:'2019-07-22';
+  toDate:'{data_atual}';
+  parentLocalType1:'STATE';
+  classes:'CUT'\,'SELECTIVE_EXTRACTION'\,'DEGRADATION_SELECTIVE_CUT';
+  inspectionFilter:'ALL'
+```
+
+### Desempenho testado
+
+- Token: < 1s
+- WFS com bbox 0.5°×0.5°: ~4s para 5 alertas
+- Detalhe de 1 alerta: ~1s
+- Paralelismo: 12 workers (configurável via `SCCON_HTTP_CONCURRENCY`)
 
 ---
 
 ## 3. WhatsApp (Baileys)
 
-### Objetivo
-Enviar notificações de alertas diretamente no WhatsApp dos usuários cadastrados.
-
-### Biblioteca
-`@whiskeysockets/baileys` — cliente WhatsApp Web não-oficial, sem custo de API.
-
 ### Arquitetura
 
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Admin        │     │  Backend      │     │  WhatsApp     │
-│  Escaneia QR  │────▶│  Baileys      │────▶│  WebSocket    │
-│               │     │  Session      │     │               │
-└──────────────┘     └──────┬───────┘     └──────────────┘
-                            │
-                     ┌──────▼───────┐
-                     │  Fila de msg  │
-                     │  (em memória) │
-                     └──────┬───────┘
-                            │
-              ┌─────────────▼──────────────┐
-              │  Para cada alerta:          │
-              │  - Número do usuário        │
-              │  - Template formatado       │
-              │  - Enviar via baileys       │
-              │  - Registrar no log         │
-              └────────────────────────────┘
-```
+Mesmo padrão do SaldoPro:
+- **Baileys** (`@whiskeysockets/baileys`) como cliente WhatsApp Web
+- **1 número conectado** (do dono/admin)
+- **Envio**: número do admin → número do usuário cadastrado
+- **Persistência**: auth state salvo no SQLite
+- **Reconexão**: automática em caso de queda
 
-### Número de WhatsApp
+### Conexão
 
-- **Apenas 1 número** conectado: o do dono/admin (você)
-- Todas as notificações são enviadas DESTE número PARA o número do usuário
-- O usuário cadastra o número dele no ato do registro
-
-### Persistência da sessão
-
-- Auth state do baileys salvo no SQLite (`whatsapp_sessions.creds_json`)
-- Em reinicialização, tenta reconectar com credenciais existentes (sem QR Code)
-- Se falhar, gera novo QR Code (admin precisa escanear de novo)
-
-### Reconexão automática
-
-- `connection.update` handler escuta por `close` e `connection.update`
-- Em caso de desconexão, tenta reconectar automaticamente
-- Se falhar após N tentativas, notifica admin para escanear QR novamente
+1. Admin acessa painel → "Conectar WhatsApp"
+2. Backend gera QR Code via baileys
+3. Admin escaneia com WhatsApp do celular
+4. Sessão persiste no SQLite — reconecta automaticamente após restart
 
 ### Template da mensagem
 
 ```
-🔔 *AlertaCAR — Novo alerta detectado*
+🔔 *AlertaCAR — Novo alerta*
 
-CAR: {car_number}
-Tipo: {type} ({system})
-Data: {date}
-Área: {area_ha} ha
+CAR: {numero_car}
+🏷️ {classe_traduzida}
+📅 {data_formatada}
+📐 {area} ha
 
-Acesse o dashboard para mais detalhes:
-alertacar.cursar.space
+📍 {municipio} - MT
+
+Acesse: alertacar.cursar.space
 ```
 
 ### Rate limiting
 
-- Máximo de 1 mensagem por CAR por hora
-- Máximo de 10 mensagens por usuário por dia
-- Evita spam se houver muitos alertas de uma vez
-- Agrupar múltiplos alertas do mesmo CAR em uma mensagem se detectados na mesma execução
-
-### Referência de implementação
-
-O SaldoPro (`/media/server/HD Backup/Servidores_NAO_MEXA/SaldoPro/backend/`) implementa o mesmo padrão com baileys. Reutilizar a lógica de conexão, QR Code e envio de mensagens.
+- Máx 1 msg por CAR por hora
+- Máx 10 msgs por usuário por dia
+- Agrupa múltiplos alertas do mesmo CAR na mesma execução

@@ -5,197 +5,238 @@
 - **Runtime**: Node.js 20+ com TypeScript
 - **Servidor**: Express
 - **Banco**: SQLite via `better-sqlite3`
-- **Auth**: Firebase Admin SDK (verificar tokens JWT do frontend)
+- **Auth**: Firebase Admin SDK
 - **Cron**: `node-cron`
-- **WhatsApp**: Baileys (WebSocket, sessão persistente)
-- **Build**: `esbuild` (bundle ESM, mesmo padrão GeoForest)
+- **Geo**: Turf.js (área, bbox, interseção) + proj4 (reprojeção)
+- **WhatsApp**: Baileys (`@whiskeysockets/baileys`)
+- **Build**: esbuild (bundle ESM, mesmo padrão GeoForest)
 
 ## Estrutura
 
 ```
 backend/
 ├── src/
-│   ├── index.ts              # Servidor Express, middleware, CORS
+│   ├── index.ts                   # Express, middleware, CORS, static serve
 │   ├── middleware/
-│   │   ├── auth.ts           # requireAuth (Firebase token)
-│   │   └── admin.ts          # requireAdmin (whitelist)
+│   │   ├── auth.ts                # requireAuth (Firebase token)
+│   │   └── admin.ts               # requireAdmin (UID whitelist)
 │   ├── routes/
-│   │   ├── auth.ts           # /api/auth/*
-│   │   ├── cars.ts           # /api/cars/*
-│   │   ├── alerts.ts         # /api/alerts/*
-│   │   └── admin.ts          # /api/admin/*
+│   │   ├── auth.ts                # /api/auth/register, /api/auth/me
+│   │   ├── cars.ts                # /api/cars CRUD + WFS lookup
+│   │   ├── alerts.ts              # /api/alerts (listagem)
+│   │   └── admin.ts               # /api/admin/* (stats, users, whatsapp)
 │   ├── services/
-│   │   ├── wfs-sema.ts       # Buscar polígono CAR no WFS da SEMA-MT
-│   │   ├── sccon.ts          # Consultar alertas SCCON (AUAS)
-│   │   ├── whatsapp.ts       # Gerenciar sessão Baileys + enviar msg
-│   │   └── notification.ts   # Fila de notificações + dispatcher
+│   │   ├── wfs-sema.ts            # Buscar polígono CAR (WFS SEMA-MT)
+│   │   ├── sccon.ts               # Token + WFS + detalhes de alertas
+│   │   ├── whatsapp.ts            # Sessão Baileys + envio
+│   │   ├── notification.ts        # Fila + dispatch
+│   │   └── car-import.ts          # Conversão nº CAR → formato WFS
 │   ├── cron/
-│   │   └── monitor.ts        # Cron diário: varre CARs → SCCON → alertas
+│   │   └── monitor.ts             # Diário 06:00 → varre CARs → SCCON → WhatsApp
 │   ├── db/
-│   │   ├── connection.ts     # Conexão SQLite (singleton)
-│   │   ├── schema.ts         # Criação de tabelas
-│   │   └── migrations/       # Migrações futuras
+│   │   ├── connection.ts          # SQLite singleton
+│   │   ├── schema.ts              # CREATE TABLE
+│   │   └── queries.ts             # Funções de acesso
 │   └── lib/
-│       ├── firebase.ts       # Firebase Admin init
-│       └── config.ts         # Configurações (PORT, paths, etc.)
+│       ├── firebase.ts            # Firebase Admin init
+│       └── config.ts              # Variáveis de ambiente tipadas
 ├── data/
-│   └── alertacar.db          # Arquivo SQLite (gitignored)
+│   └── alertacar.db               # SQLite (gitignored)
 ├── package.json
-├── tsconfig.json
-└── .env
+└── tsconfig.json
+```
+
+## Schema SQLite
+
+```sql
+-- Usuários (Firebase uid)
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,               -- Firebase Auth uid
+  email TEXT NOT NULL,
+  name TEXT NOT NULL,
+  whatsapp_number TEXT NOT NULL,     -- +55XXXXXXXXXXX
+  active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- CARs monitorados
+CREATE TABLE cars (
+  id TEXT PRIMARY KEY,               -- UUID
+  user_id TEXT NOT NULL REFERENCES users(id),
+  car_number TEXT NOT NULL,          -- Nº no formato original
+  car_number_wfs TEXT,               -- Nº no formato WFS (MTXXXXX/YYYY)
+  polygon_json TEXT,                 -- GeoJSON Polygon
+  area_ha REAL,
+  municipality TEXT,
+  status_car TEXT,                   -- status atual do CAR
+  last_polygon_fetch TEXT,           -- ISO timestamp
+  last_check_at TEXT,
+  active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, car_number)
+);
+
+-- Alertas detectados
+CREATE TABLE alerts (
+  id TEXT PRIMARY KEY,               -- UUID
+  car_id TEXT NOT NULL REFERENCES cars(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  alert_local_id INTEGER,            -- idt_local_alert da SCCON
+  source TEXT NOT NULL,              -- 'sccon' | 'sema_embargo' | 'sema_status'
+  class_type TEXT,                   -- CUT, SELECTIVE_EXTRACTION, etc.
+  detected_date TEXT NOT NULL,       -- Data da detecção (ISO)
+  area_ha REAL,
+  title TEXT NOT NULL,
+  description TEXT,
+  geometry_json TEXT,                -- GeoJSON da geometria do alerta
+  sent_to_whatsapp INTEGER DEFAULT 0,
+  sent_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Sessão WhatsApp Baileys
+CREATE TABLE whatsapp_sessions (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  creds_json TEXT,                   -- Credenciais do baileys
+  connected INTEGER DEFAULT 0,
+  phone_number TEXT,
+  last_connected TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Log de execução do cron
+CREATE TABLE cron_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  cars_processed INTEGER DEFAULT 0,
+  alerts_found INTEGER DEFAULT 0,
+  alerts_sent INTEGER DEFAULT 0,
+  errors INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'running'      -- 'running' | 'completed' | 'failed'
+);
+
+-- Índices
+CREATE INDEX idx_cars_user ON cars(user_id, active);
+CREATE INDEX idx_alerts_car ON alerts(car_id, detected_date);
+CREATE INDEX idx_alerts_user ON alerts(user_id, created_at);
+CREATE INDEX idx_alerts_local_id ON alerts(alert_local_id);
 ```
 
 ## Endpoints da API
 
-### Públicos (sem auth)
+### Públicos
 
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET | `/api/health` | Healthcheck |
-| GET | `/api/admin/whatsapp/qr` | QR Code do WhatsApp (admin only via token) |
+| Método | Rota | Auth | Descrição |
+|--------|------|------|-----------|
+| GET | `/api/health` | Não | `{status:"ok", uptime:123}` |
 
 ### Autenticados (usuário)
 
+| Método | Rota | Auth | Descrição |
+|--------|------|------|-----------|
+| POST | `/api/auth/register` | Firebase | Criar registro local (uid + WhatsApp) |
+| GET | `/api/auth/me` | Firebase | Dados do usuário |
+| PUT | `/api/auth/me` | Firebase | Atualizar WhatsApp |
+| GET | `/api/cars` | Firebase | Listar CARs do usuário |
+| POST | `/api/cars` | Firebase | Adicionar CAR → busca WFS |
+| GET | `/api/cars/:id` | Firebase | Detalhes + polígono |
+| DELETE | `/api/cars/:id` | Firebase | Parar monitoramento |
+| GET | `/api/cars/:id/alerts` | Firebase | Alertas do CAR |
+| POST | `/api/cars/:id/check` | Firebase | Forçar consulta agora |
+
+### Admin (requireAdmin)
+
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| POST | `/api/auth/register` | Registrar usuário (Firebase uid + WhatsApp) |
-| GET | `/api/auth/me` | Dados do usuário logado |
-| PUT | `/api/auth/me` | Atualizar perfil (WhatsApp) |
-| GET | `/api/cars` | Listar CARs do usuário |
-| POST | `/api/cars` | Adicionar CAR (nº CAR → busca polígono WFS) |
-| GET | `/api/cars/:id` | Detalhes do CAR |
-| DELETE | `/api/cars/:id` | Remover CAR do monitoramento |
-| GET | `/api/cars/:id/alerts` | Listar alertas do CAR |
-| POST | `/api/cars/:id/check` | Forçar re-consulta agora |
+| GET | `/api/admin/stats` | Cards do dashboard |
+| GET | `/api/admin/users` | Lista usuários |
+| PUT | `/api/admin/users/:id` | Ativar/desativar |
+| GET | `/api/admin/cron/status` | Último cron |
+| POST | `/api/admin/cron/run` | Executar cron agora |
+| GET | `/api/admin/notifications` | Log de envios |
+| GET | `/api/admin/whatsapp/status` | Status conexão |
+| GET | `/api/admin/whatsapp/qr` | QR Code (base64) |
+| POST | `/api/admin/whatsapp/reconnect` | Reconectar |
+| POST | `/api/admin/whatsapp/disconnect` | Desconectar |
 
-### Admin
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET | `/api/admin/stats` | Estatísticas gerais |
-| GET | `/api/admin/users` | Listar usuários |
-| PUT | `/api/admin/users/:id` | Ativar/desativar usuário |
-| GET | `/api/admin/notifications` | Log de notificações enviadas |
-| GET | `/api/admin/whatsapp/status` | Status da conexão WhatsApp |
-| POST | `/api/admin/whatsapp/reconnect` | Reconectar WhatsApp |
-
-## Serviço WFS SEMA-MT
+## Serviço WFS SEMA (`wfs-sema.ts`)
 
 ```typescript
-// services/wfs-sema.ts
 interface CarPolygon {
   carNumber: string
+  carNumberWfs: string
   geometry: GeoJSON.Polygon
   areaHa: number
   properties: {
-    cod_imovel: string
+    codigo: number
     municipio: string
-    status: string
-    // ...
+    situacao: string
+    abertura?: string
   }
 }
 
-// Busca polígono do CAR e faz cache por 30 dias
-async function fetchCarPolygon(carNumber: string): Promise<CarPolygon>
+async function fetchCarPolygon(carNumber: string): Promise<CarPolygon | null>
 ```
 
-**Método**: WFS `GetFeature` com `BBOX` para a área do CAR. INTERSECTS não é confiável no GeoServer da SEMA (retorna subconjunto sem erro).
+**Método**: Converter nº para formato WFS (`MTXXXXX/YYYY`) → CQL_FILTER na camada `CAR_ATP` → parsear geometria → reprojetar SIRGAS 2000 → WGS84.
 
-**Cache**: Polígono cacheado no SQLite. Se última busca < 30 dias, usa cache. Se falhar, mantém o cache antigo (não invalida em falha).
+**Cache**: Polígono cacheado 30 dias. Se falhar, mantém cache antigo.
 
-**Pitfalls**:
-- Paginação quebrada no GeoServer da SEMA — `startIndex` causa timeout
-- Timeout frequente — implementar retry (3 tentativas)
-- INTERSECTS retorna subconjunto — usar sempre BBOX + clip local com Turf.js
-
-## Serviço SCCON
+## Serviço SCCON (`sccon.ts`)
 
 ```typescript
-// services/sccon.ts
 interface ScconAlert {
-  id: string
-  type: 'desmatamento' | 'degradacao'
-  date: string
+  localId: number
+  classType: string          // CUT, SELECTIVE_EXTRACTION, etc.
+  date: Date
   areaHa: number
-  description: string
+  feature: Feature<Polygon>
 }
 
-// Consulta alertas SCCON para uma geometria
-async function fetchScconAlerts(geometry: GeoJSON.Polygon): Promise<ScconAlert[]>
+async function getPublicToken(): Promise<string>
+async function fetchAlertsForGeometry(geometry: Polygon): Promise<ScconAlert[]>
 ```
 
-**Método**: A definir durante implementação — reutilizar lógica do GeoForest (AUAS×SCCON). Possivelmente consulta por coordenadas do centróide ou envio do polígono completo.
+**Fluxo**: Token público → userId → WFS com bbox do polígono → IDs de alertas → detalhes em paralelo → spatial join (quais intersectam o polígono?).
 
-**Detecção de novos alertas**: Comparar `id` do alerta SCCON com os já salvos no banco. Só criar registro se for novo.
+**Paralelismo**: 12 workers HTTP simultâneos para buscar detalhes.
 
-## Cron de Monitoramento
+**Detecção de novos**: `alert_local_id` não existente no banco = novo alerta.
 
-```typescript
-// cron/monitor.ts
-// Executa diariamente às 06:00
-async function dailyMonitor() {
-  const activeCars = getAllActiveCars()
-  let alertsFound = 0
+## Cron (`cron/monitor.ts`)
 
-  for (const car of activeCars) {
-    try {
-      const polygon = getCachedOrFetch(car)
-      const scconAlerts = await fetchScconAlerts(polygon)
-      const newAlerts = filterNewAlerts(car.id, scconAlerts)
-
-      if (newAlerts.length > 0) {
-        saveAlerts(car.id, newAlerts)
-        enqueueWhatsApp(car.user_id, car.car_number, newAlerts)
-        alertsFound += newAlerts.length
-      }
-    } catch (err) {
-      logError(`Falha ao processar CAR ${car.car_number}: ${err.message}`)
-    }
-  }
-
-  logInfo(`Monitoramento concluído: ${activeCars.length} CARs, ${alertsFound} alertas novos`)
-}
+```
+06:00 BRT diário:
+  FOR each active CAR:
+    1. Carregar polígono (cache ou fetch WFS SEMA)
+    2. fetchAlertsForGeometry(polygon) → SCCON
+    3. Filtrar apenas alertas NOVOS (não estão no banco)
+    4. Salvar novos alertas
+    5. Se novos > 0 → enfileirar WhatsApp
+    6. Se falhar → logar erro, continuar próximo CAR
+  END FOR
+  Gravar cron_log
 ```
 
-## Serviço WhatsApp (Baileys)
+## WhatsApp (`whatsapp.ts`)
 
 ```typescript
-// services/whatsapp.ts
-import makeWASocket from '@whiskeysockets/baileys'
-
-// Singleton da conexão
-let sock: WASocket | null = null
-
-// Em produção, usar SQLite para auth state
 async function connect(): Promise<void>
-async function disconnect(): Promise<void>
-function getStatus(): 'connected' | 'disconnected' | 'connecting'
-function getQrCode(): string | null  // base64 do QR
-
-// Envia mensagem de alerta formatada
-async function sendAlert(to: string, alert: AlertData): Promise<boolean>
-
-// Formato da mensagem:
-// 🔔 *AlertaCAR — Novo alerta detectado*
-// CAR: 271442
-// Tipo: Desmatamento
-// Data: 21/07/2026
-// Área: 12.5 ha
-// —
-// Acesse alertacar.cursar.space para mais detalhes
+function getQrCode(): string | null
+function getStatus(): { connected: boolean; phone?: string; uptime?: number }
+async function sendAlert(to: string, carNumber: string, alerts: Alert[]): Promise<boolean>
 ```
-
-**Persistência da sessão**: Auth state do baileys salvo no SQLite (`whatsapp_sessions`). Reconexão automática em caso de queda.
-
-**Conexão única**: Apenas 1 número de WhatsApp conectado (o do admin/dono). Todos os alertas são enviados por esse número para os WhatsApps cadastrados dos usuários.
 
 ## Deploy
 
-Ver `DEPLOY.md`.
+Ver `DEPLOY.md` para systemd, Cloudflare Tunnel e variáveis de ambiente.
 
 ## Pitfalls
 
-- **Baileys desconecta sozinho** — Implementar `connection.update` handler com reconexão automática
-- **WFS SEMA é lento** — Timeout de 30s, retry 3x, cache agressivo
-- **SCCON pode mudar API** — Abstrair em serviço isolado, fácil de trocar
-- **NUNCA usar kill no processo** — Backend roda com `Restart=always`, usar `systemctl --user restart`
+- **Baileys desconecta**: handler `connection.update` + reconexão automática
+- **WFS SEMA timeout**: retry 3x, cache agressivo, não usar `startIndex`
+- **SCCON token expira**: renovar automaticamente, cache 23h
+- **INTERSECTS WFS não confiável**: usar CQL_FILTER ou BBOX + clip local
+- **NUNCA usar kill**: backend com `Restart=always`, usar `systemctl --user restart`
+- **Porta 3002**: não conflita com GeoForest (3001), Nexus, Auracore, VendaFácil
