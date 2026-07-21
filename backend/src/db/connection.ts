@@ -134,6 +134,60 @@ export function initializeSchema() {
       UNIQUE(car_id, year)
     );
 
+    -- Fase 7: conversas, respostas e análises de IA. Nenhum dado pessoal do cliente é enviado ao modelo.
+    CREATE TABLE IF NOT EXISTS ai_threads (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      scope TEXT NOT NULL CHECK(scope IN ('car', 'portfolio')),
+      car_id TEXT REFERENCES cars(id),
+      title TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_messages (
+      id TEXT PRIMARY KEY,
+      thread_id TEXT NOT NULL REFERENCES ai_threads(id),
+      role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+      content TEXT NOT NULL,
+      tokens_in INTEGER,
+      tokens_out INTEGER,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS risk_scores (
+      id TEXT PRIMARY KEY,
+      car_id TEXT NOT NULL REFERENCES cars(id),
+      score INTEGER NOT NULL,
+      band TEXT NOT NULL CHECK(band IN ('baixo', 'medio', 'alto', 'critico')),
+      components_json TEXT NOT NULL,
+      explanation TEXT,
+      context_hash TEXT NOT NULL,
+      computed_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(car_id, context_hash)
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_laudos (
+      id TEXT PRIMARY KEY,
+      car_id TEXT NOT NULL REFERENCES cars(id),
+      user_id TEXT NOT NULL REFERENCES users(id),
+      content_md TEXT NOT NULL,
+      context_hash TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'rascunho' CHECK(status IN ('rascunho', 'final')),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_cache (
+      cache_key TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      kind TEXT NOT NULL,
+      content TEXT NOT NULL,
+      tokens_in INTEGER,
+      tokens_out INTEGER,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_cars_user ON cars(user_id, active);
     CREATE INDEX IF NOT EXISTS idx_alerts_car ON alerts(car_id, detected_date);
     CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id, created_at);
@@ -142,6 +196,9 @@ export function initializeSchema() {
     CREATE INDEX IF NOT EXISTS idx_car_licenses_car ON car_licenses(car_id);
     CREATE INDEX IF NOT EXISTS idx_car_sobreposicoes_car ON car_sobreposicoes(car_id);
     CREATE INDEX IF NOT EXISTS idx_car_ndvi_car ON car_ndvi(car_id, year);
+    CREATE INDEX IF NOT EXISTS idx_ai_threads_user ON ai_threads(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_ai_messages_thread ON ai_messages(thread_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_risk_scores_car ON risk_scores(car_id, computed_at DESC);
   `)
 
   addColumnIfMissing('cars', 'bioma', 'TEXT')

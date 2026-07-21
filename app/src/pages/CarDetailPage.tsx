@@ -6,14 +6,16 @@ import type { CarDetail } from '../lib/types'
 import CarMap from '../components/CarMap'
 import AlertsPanel from '../components/AlertsPanel'
 import SatelliteTab from '../components/SatelliteTab'
+import AiAssistantTab from '../components/AiAssistantTab'
 
-type Tab = 'visao-geral' | 'alertas' | 'mapa' | 'satelite' | 'camadas' | 'config'
+type Tab = 'visao-geral' | 'alertas' | 'mapa' | 'satelite' | 'ia' | 'camadas' | 'config'
 
 const TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: 'visao-geral', label: 'Visão Geral', icon: '📊' },
   { key: 'alertas', label: 'Alertas', icon: '🔔' },
   { key: 'mapa', label: 'Mapa', icon: '🗺️' },
   { key: 'satelite', label: 'Satélite', icon: '🛰️' },
+  { key: 'ia', label: 'IA', icon: '🤖' },
   { key: 'camadas', label: 'Camadas', icon: '📐' },
   { key: 'config', label: 'Config', icon: '⚙️' },
 ]
@@ -170,6 +172,8 @@ export default function CarDetailPage() {
         {tab === 'mapa' && <CarMap car={car} alerts={alerts} />}
 
         {tab === 'satelite' && <SatelliteTab car={car} carId={carId} />}
+
+        {tab === 'ia' && <AiAssistantTab carId={carId} />}
 
         {tab === 'camadas' && (
           <div className="glass-card overflow-x-auto">

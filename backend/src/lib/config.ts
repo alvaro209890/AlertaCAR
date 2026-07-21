@@ -14,6 +14,13 @@ const config = {
     baseUrl: process.env.WFS_BASE_URL || 'https://geo.sema.mt.gov.br/geoserver/ows',
     authkey: process.env.WFS_AUTHKEY || '541085de-9a2e-454e-bdba-eb3d57a2f492',
   },
+  ai: {
+    apiKey: process.env.DEEPSEEK_API_KEY || '',
+    baseUrl: (process.env.DEEPSEEK_API_BASE_URL || 'https://api.deepseek.com/v1').replace(/\/$/, ''),
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+    timeoutMs: Math.max(1_000, parseInt(process.env.DEEPSEEK_TIMEOUT_MS || '30000', 10) || 30000),
+    maxRetries: Math.min(3, Math.max(0, parseInt(process.env.DEEPSEEK_MAX_RETRIES || '1', 10) || 0)),
+  },
   bcryptRounds: 12,
   jwtExpiresIn: '7d',
 }

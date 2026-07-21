@@ -256,37 +256,37 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 
 ---
 
-## Fase 7 — IA robusta (DeepSeek V4 Flash) 🤖
+## Fase 7 — IA robusta (DeepSeek) 🤖
 
-> Modelo: **`deepseek-v4-flash`** via `api.deepseek.com/v1` (`DEEPSEEK_API_KEY`), raciocínio médio.
+> Modelo configurável via `DEEPSEEK_MODEL` (padrão atual: **`deepseek-chat`**) em `api.deepseek.com/v1` (`DEEPSEEK_API_KEY`).
 > Detalhes de arquitetura, prompts e endpoints em **[IA-ASSISTENTE.md](./IA-ASSISTENTE.md)**.
 
 ### 7.1 Fundação de IA
-- [ ] `services/ai.ts` — cliente DeepSeek (base URL, chave, timeout, retry, streaming)
-- [ ] `services/ai-context.ts` — **context builder**: monta contexto do CAR (dados cadastrais + camadas + alertas + sobreposições + autorizações + NDVI) em JSON compacto
+- [x] `services/ai.ts` — cliente DeepSeek (base URL, chave, timeout e retry; streaming SSE ainda pendente)
+- [x] `services/ai-context.ts` — **context builder**: monta contexto do CAR (dados cadastrais + camadas + alertas + sobreposições + autorizações + NDVI) em JSON compacto, sem PII do cliente
 - [ ] **RAG jurídico-ambiental**: portar `GeoForest/backend/knowledge-base.ts` + `banco_de_dados/` (29 arquivos: Código Florestal, SNUC, Código Ambiental MT, APP/RL/PMFS, matrizes de decisão) para aterrar recomendações e implicações legais — carregar só docs relevantes por pergunta
-- [ ] Guardrails + disclaimer obrigatório ("análise preliminar, consulte o RT")
-- [ ] Cache de respostas + rate limiting por usuário
+- [x] Guardrails + disclaimer obrigatório ("análise preliminar, consulte o RT")
+- [x] Cache de respostas SQLite + rate limiting por usuário (60 chamadas/h por processo)
 
 ### 7.2 Assistente conversacional
-- [ ] `POST /api/ai/chat` — chat por CAR ("o que aconteceu esse mês?", "esse alerta é grave?", "tem autorização?")
+- [x] `POST /api/ai/chat` — chat por CAR ("o que aconteceu esse mês?", "esse alerta é grave?", "tem autorização?")
 - [ ] Chat de **carteira** ("quais imóveis têm mais risco?", "resuma a semana de todos os clientes")
-- [ ] Threads persistentes (`ai_threads` / `ai_messages`), streaming no front (aba IA)
+- [ ] Threads persistentes (`ai_threads` / `ai_messages`) e streaming SSE no front (threads já persistem; SSE ainda pendente)
 
 ### 7.3 Inteligência sobre os dados
-- [ ] `GET /api/cars/:id/risk-score` — **score 0–100** de risco de desmate + explicação (features: histórico, tendência NDVI, vizinho, sobreposições, uso consolidado)
-- [ ] `POST /api/cars/:id/ai/summary` — resumo em linguagem natural dos alertas do período
-- [ ] `POST /api/cars/:id/ai/ndvi-analysis` — interpreta o diff NDVI (Fase 6): polígonos com perda, área, severidade, parecer
-- [ ] `POST /api/ai/triage` — sugere se um alerta é **verdadeiro / falso positivo / provável legal**
-- [ ] `POST /api/cars/:id/ai/recomendacoes` — próximos passos conforme o achado (embargo → defesa/prazo; desmate sem AUTEX → alerta; licença vencendo → renovar)
+- [x] `GET /api/cars/:id/risk-score` — **score 0–100** determinístico + explicação (histórico, tendência NDVI, sobreposições e conformidade disponíveis)
+- [x] `POST /api/cars/:id/ai/summary` — resumo em linguagem natural dos alertas do período
+- [x] `POST /api/cars/:id/ai/ndvi-analysis` — interpreta a tendência NDVI amostrada (diff espacial por polígonos ainda depende de uma fonte de mudança)
+- [x] `POST /api/ai/triage` — sugere se um alerta é **verdadeiro / falso positivo / provável legal**
+- [x] `POST /api/cars/:id/ai/recomendacoes` — próximos passos conforme o achado
 
 ### 7.4 Gerador de laudo/parecer ⭐⭐
-- [ ] `POST /api/cars/:id/ai/laudo` — minuta de laudo técnico (contexto completo → texto estruturado editável)
+- [x] `POST /api/cars/:id/ai/laudo` — minuta de laudo técnico em Markdown, salva como rascunho
 - [ ] Editor no front com blocos (introdução, análise, conclusão, recomendações) + inserir mapas/NDVI
 - [ ] Exporta para o PDF da Fase 9
 
 ### 7.5 UX de IA no app
-- [ ] Aba **IA** na página do CAR (chat + botões "explicar este alerta", "gerar resumo", "gerar laudo")
+- [x] Aba **IA** na página do CAR (chat + score + botões de resumo, próximos passos e minuta de laudo)
 - [ ] Widget "Pergunte sobre sua carteira" no dashboard
 - [ ] Badge de score de risco nos cards e na tabela da carteira
 

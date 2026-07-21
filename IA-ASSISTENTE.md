@@ -8,7 +8,7 @@
 
 | Item | Valor |
 |------|-------|
-| Modelo | **`deepseek-v4-flash`** |
+| Modelo | Configurável por `DEEPSEEK_MODEL` (padrão: **`deepseek-chat`**) |
 | Base URL | `https://api.deepseek.com/v1` |
 | Chave | `DEEPSEEK_API_KEY` (env — **nunca commitar**) |
 | Raciocínio | médio (Flash) — rápido e barato, ideal para resumos/triagem/chat |
