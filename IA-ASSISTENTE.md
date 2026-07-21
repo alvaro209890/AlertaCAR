@@ -67,6 +67,13 @@ interface CarContext {
 
 Tudo isso já vem das Fases 4–6 — a IA **não busca dados**, só recebe o contexto pronto.
 
+### RAG jurídico-ambiental
+
+O backend mantém uma cópia versionada da base jurídica/técnica em `backend/knowledge/` e faz seleção
+lexical determinística antes de chamar o modelo. Apenas até quatro documentos e
+`AI_KNOWLEDGE_MAX_CHARS` caracteres de trechos pertinentes acompanham a pergunta. As referências são
+apoio interno: a resposta deve indicar a necessidade de validar a fonte oficial atualizada.
+
 ---
 
 ## Funcionalidades e endpoints

@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import path from 'node:path'
 
 const config = {
   port: parseInt(process.env.PORT || '3002', 10),
@@ -20,6 +21,8 @@ const config = {
     model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
     timeoutMs: Math.max(1_000, parseInt(process.env.DEEPSEEK_TIMEOUT_MS || '30000', 10) || 30000),
     maxRetries: Math.min(3, Math.max(0, parseInt(process.env.DEEPSEEK_MAX_RETRIES || '1', 10) || 0)),
+    knowledgePath: process.env.AI_KNOWLEDGE_PATH || path.resolve(process.cwd(), 'knowledge'),
+    knowledgeMaxChars: Math.min(12_000, Math.max(1_000, parseInt(process.env.AI_KNOWLEDGE_MAX_CHARS || '6000', 10) || 6000)),
   },
   bcryptRounds: 12,
   jwtExpiresIn: '7d',

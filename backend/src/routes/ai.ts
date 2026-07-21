@@ -5,6 +5,7 @@ import db from '../db/connection.js'
 import { buildCarContext, buildPortfolioContext, hashAiContext, type CarAiContext } from '../services/ai-context.js'
 import { AiUnavailableError, completeAi, isAiConfigured, streamAi, type AiMessage } from '../services/ai.js'
 import { calculateRiskScore, deterministicRiskExplanation } from '../services/risk-score.js'
+import { legalKnowledgeHealth, selectLegalKnowledge } from '../services/legal-knowledge.js'
 
 const router = Router()
 const DISCLAIMER = 'Análise preliminar de apoio à decisão. Consulte o Responsável Técnico antes de agir.'
@@ -13,7 +14,7 @@ const requestTimes = new Map<string, number[]>()
 router.use(requireAuth)
 
 router.get('/ai/status', (_req, res) => {
-  res.json({ configured: isAiConfigured(), disclaimer: DISCLAIMER })
+  res.json({ configured: isAiConfigured(), disclaimer: DISCLAIMER, knowledge: legalKnowledgeHealth() })
 })
 
 // GET /api/cars/:id/risk-score — score é determinístico; a IA apenas explica os fatores calculados.
@@ -112,10 +113,8 @@ router.post('/ai/chat', async (req: AuthRequest, res) => {
     const thread = getOrCreateThread(String(req.body?.threadId || ''), userId, scope, carId)
     db.prepare('INSERT INTO ai_messages (id, thread_id, role, content) VALUES (?, ?, ?, ?)').run(uuid(), thread.id, 'user', message)
     const previous = db.prepare('SELECT role, content FROM ai_messages WHERE thread_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 8').all(thread.id) as Array<{ role: 'user' | 'assistant'; content: string }>
-    const result = await askAi(userId, `chat:${thread.id}`, hashAiContext({ context, message, previous }), [
-      { role: 'system', content: systemPrompt('Responda com objetividade à pergunta do consultor usando apenas o contexto fornecido e deixe claras as incertezas.') },
-      { role: 'user', content: `Contexto ambiental:\n${JSON.stringify(context)}\n\nHistórico recente:\n${JSON.stringify(previous.reverse())}\n\nPergunta: ${message}` },
-    ], 700)
+    const legalKnowledge = selectLegalKnowledge(`${message}\n${JSON.stringify(context)}`)
+    const result = await askAi(userId, `chat:${thread.id}`, hashAiContext({ context, message, previous, legal: legalKnowledge.documents }), chatMessages(context, previous.reverse(), message, legalKnowledge.context), 700)
     const content = withDisclaimer(result.content)
     db.prepare('INSERT INTO ai_messages (id, thread_id, role, content, tokens_in, tokens_out) VALUES (?, ?, ?, ?, ?, ?)').run(uuid(), thread.id, 'assistant', content, result.tokensIn, result.tokensOut)
     db.prepare("UPDATE ai_threads SET updated_at = datetime('now'), title = COALESCE(title, ?) WHERE id = ?").run(message.slice(0, 100), thread.id)
@@ -137,11 +136,9 @@ router.post('/ai/chat/stream', async (req: AuthRequest, res) => {
     const thread = getOrCreateThread(String(req.body?.threadId || ''), userId, scope, carId)
     db.prepare('INSERT INTO ai_messages (id, thread_id, role, content) VALUES (?, ?, ?, ?)').run(uuid(), thread.id, 'user', message)
     const previous = db.prepare('SELECT role, content FROM ai_messages WHERE thread_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 8').all(thread.id) as Array<{ role: 'user' | 'assistant'; content: string }>
-    const cacheKey = hashAiContext({ context, message, previous })
-    const messages: AiMessage[] = [
-      { role: 'system', content: systemPrompt('Responda com objetividade à pergunta do consultor usando apenas o contexto fornecido e deixe claras as incertezas.') },
-      { role: 'user', content: `Contexto ambiental:\n${JSON.stringify(context)}\n\nHistórico recente:\n${JSON.stringify(previous.reverse())}\n\nPergunta: ${message}` },
-    ]
+    const legalKnowledge = selectLegalKnowledge(`${message}\n${JSON.stringify(context)}`)
+    const cacheKey = hashAiContext({ context, message, previous, legal: legalKnowledge.documents })
+    const messages = chatMessages(context, previous.reverse(), message, legalKnowledge.context)
 
     res.status(200).set({
       'Content-Type': 'text/event-stream; charset=utf-8',
@@ -202,12 +199,24 @@ function getOrCreateThread(threadId: string, userId: string, scope: 'car' | 'por
 }
 
 async function generateForCar(userId: string, kind: string, context: CarAiContext, instruction: string, maxTokens: number) {
-  const cacheKey = hashAiContext({ kind, context })
+  const legalKnowledge = selectLegalKnowledge(`${instruction}\n${JSON.stringify(context)}`)
+  const cacheKey = hashAiContext({ kind, context, legal: legalKnowledge.documents })
   const result = await askAi(userId, kind, cacheKey, [
-    { role: 'system', content: systemPrompt(instruction) },
-    { role: 'user', content: `Contexto ambiental do imóvel (dados cadastrais e ambientais, sem dados pessoais):\n${JSON.stringify(context)}` },
+    { role: 'system', content: systemPrompt(`${instruction}${legalKnowledge.context ? ' Use as referências internas somente quando forem pertinentes e cite pelo título, sem tratá-las como texto oficial atualizado.' : ''}`) },
+    { role: 'user', content: `Contexto ambiental do imóvel (dados cadastrais e ambientais, sem dados pessoais):\n${JSON.stringify(context)}${formatLegalKnowledge(legalKnowledge.context)}` },
   ], maxTokens)
   return result
+}
+
+function chatMessages(context: unknown, previous: Array<{ role: 'user' | 'assistant'; content: string }>, message: string, legalContext: string): AiMessage[] {
+  return [
+    { role: 'system', content: systemPrompt(`Responda com objetividade à pergunta do consultor usando apenas o contexto fornecido e deixe claras as incertezas.${legalContext ? ' Use as referências internas apenas quando pertinentes e cite pelo título, sem tratá-las como texto oficial atualizado.' : ''}`) },
+    { role: 'user', content: `Contexto ambiental:\n${JSON.stringify(context)}\n\nHistórico recente:\n${JSON.stringify(previous)}\n\nPergunta: ${message}${formatLegalKnowledge(legalContext)}` },
+  ]
+}
+
+function formatLegalKnowledge(context: string) {
+  return context ? `\n\nReferências jurídicas internas selecionadas (podem estar desatualizadas; valide na fonte oficial):\n${context}` : ''
 }
 
 async function askAi(userId: string, kind: string, cacheKey: string, messages: AiMessage[], maxTokens: number) {

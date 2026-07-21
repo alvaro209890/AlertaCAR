@@ -264,7 +264,7 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 ### 7.1 Fundação de IA
 - [x] `services/ai.ts` — cliente DeepSeek (base URL, chave, timeout, retry e streaming SSE)
 - [x] `services/ai-context.ts` — **context builder**: monta contexto do CAR (dados cadastrais + camadas + alertas + sobreposições + autorizações + NDVI) em JSON compacto, sem PII do cliente
-- [ ] **RAG jurídico-ambiental**: portar `GeoForest/backend/knowledge-base.ts` + `banco_de_dados/` (29 arquivos: Código Florestal, SNUC, Código Ambiental MT, APP/RL/PMFS, matrizes de decisão) para aterrar recomendações e implicações legais — carregar só docs relevantes por pergunta
+- [x] **RAG jurídico-ambiental**: 39 documentos do GeoForest portados em `backend/knowledge/`; seletor local carrega só trechos relevantes por pergunta, com teto de contexto configurável
 - [x] Guardrails + disclaimer obrigatório ("análise preliminar, consulte o RT")
 - [x] Cache de respostas SQLite + rate limiting por usuário (60 chamadas/h por processo)
 
