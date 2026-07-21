@@ -40,8 +40,8 @@ consultor não precisa logar em 5 sistemas diferentes por imóvel, todo dia, par
 | 2 | ✅ | CRUD CARs + WFS SEMA (polígono) |
 | 3 | ✅ | SCCON monitoramento + cron diário |
 | 4 | ✅ backend | Fontes expandidas — SEMA multicamada + camadas do CAR + conformidade ARL (validado ao vivo); faltam INPE e vizinhança |
-| 5 | 🚧 core pronto | Página de Detalhes (5 abas), Mapa Leaflet + camadas SEMA no navegador, workflow de alertas (status/severidade/notas), apelido — faltam score de risco (IA), satélite, anexos, cluster de marcadores |
-| 6 | ⏳ | Satélite / NDVI / Timelapse |
+| 5 | 🚧 core pronto | Página de Detalhes (5 abas), Mapa Leaflet + camadas SEMA no navegador, workflow de alertas (status/severidade/notas), apelido — faltam score de risco (IA), anexos, cluster de marcadores |
+| 6 | 🚧 core pronto | Aba Satélite: timelapse por slider (Landsat 5 1984 → Sentinel-2 2025), split-view, **NDVI real** amostrado via `GetFeatureInfo` (WCS está desabilitado no servidor da SEMA) + gráfico de tendência — faltam GIF/MP4, downloads, falsa-cor NIR (não existe nesse servidor, ver [CAMADAS-SEMA.md](./CAMADAS-SEMA.md)) |
 | 7 | ⏳ | IA robusta (DeepSeek V4 Flash) |
 | 8 | ⏳ | Gestão de Carteira (consultor) |
 | 9 | ⏳ | Relatórios + Exportações + Interoperabilidade GIS |
@@ -109,6 +109,7 @@ Banco_de_dados/AlertaCAR/               # Dados (fora do repo)
 | Cron monitoramento | ✅ | node-cron 06:00 GMT-3 (SCCON + Fase 4) |
 | WFS multicamada (Fase 4) | ✅ | 45 testes unitários + validado ao vivo: CAR real MT8019/2017 → ARL 930,68 ha, bioma Amazônia, déficit ARL zerado, 9 autorizações únicas, 5 camadas do CAR com área |
 | Workflow de alertas (Fase 5) | ✅ | 56 testes (backend, total) + PATCH status/notas validado ao vivo (status inválido → 400, filtros por fonte/status funcionando); build + typecheck do app limpos |
+| Satélite + NDVI real (Fase 6) | ✅ | 74 testes (backend, total) + validado ao vivo: CAR MT8019/2017 → NDVI médio 2024 = 0,74 (88,9% acima do limiar de vegetação), tendência 2016–2025 "estável" (+0,046), 27/27 pontos amostrados em cada ano, cache confirmado (5,4s → 0,05s); descoberta: WCS desabilitado + "layer NIR" é só um style idêntico ao RGB — NDVI feito via `GetFeatureInfo` pixel a pixel |
 
 ## 🚀 Como rodar
 

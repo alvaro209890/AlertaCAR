@@ -119,6 +119,21 @@ export function initializeSchema() {
       UNIQUE(car_id, tipo, nome)
     );
 
+    -- Fase 6: NDVI amostrado por ano via GetFeatureInfo (cache — evita reamostrar toda hora)
+    CREATE TABLE IF NOT EXISTS car_ndvi (
+      id TEXT PRIMARY KEY,
+      car_id TEXT NOT NULL REFERENCES cars(id),
+      year INTEGER NOT NULL,
+      mean_ndvi REAL,
+      min_ndvi REAL,
+      max_ndvi REAL,
+      pct_vegetacao REAL,
+      sampled_points INTEGER NOT NULL DEFAULT 0,
+      attempted_points INTEGER NOT NULL DEFAULT 0,
+      computed_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(car_id, year)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_cars_user ON cars(user_id, active);
     CREATE INDEX IF NOT EXISTS idx_alerts_car ON alerts(car_id, detected_date);
     CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id, created_at);
@@ -126,6 +141,7 @@ export function initializeSchema() {
     CREATE INDEX IF NOT EXISTS idx_car_layers_car ON car_layers(car_id);
     CREATE INDEX IF NOT EXISTS idx_car_licenses_car ON car_licenses(car_id);
     CREATE INDEX IF NOT EXISTS idx_car_sobreposicoes_car ON car_sobreposicoes(car_id);
+    CREATE INDEX IF NOT EXISTS idx_car_ndvi_car ON car_ndvi(car_id, year);
   `)
 
   addColumnIfMissing('cars', 'bioma', 'TEXT')

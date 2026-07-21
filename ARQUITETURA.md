@@ -187,6 +187,21 @@ CREATE TABLE car_sobreposicoes (
   UNIQUE(car_id, tipo, nome)
 );
 
+-- NDVI amostrado por ano via GetFeatureInfo (Fase 6) — cache pra não reamostrar toda hora
+CREATE TABLE car_ndvi (
+  id TEXT PRIMARY KEY,
+  car_id TEXT NOT NULL REFERENCES cars(id),
+  year INTEGER NOT NULL,
+  mean_ndvi REAL,
+  min_ndvi REAL,
+  max_ndvi REAL,
+  pct_vegetacao REAL,               -- % de pontos amostrados com NDVI > 0,3
+  sampled_points INTEGER NOT NULL DEFAULT 0,
+  attempted_points INTEGER NOT NULL DEFAULT 0,
+  computed_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(car_id, year)
+);
+
 -- Alertas detectados (qualquer fonte)
 CREATE TABLE alerts (
   id TEXT PRIMARY KEY,

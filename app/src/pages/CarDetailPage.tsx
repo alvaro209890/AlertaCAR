@@ -5,13 +5,15 @@ import { apiFetch } from '../lib/api'
 import type { CarDetail } from '../lib/types'
 import CarMap from '../components/CarMap'
 import AlertsPanel from '../components/AlertsPanel'
+import SatelliteTab from '../components/SatelliteTab'
 
-type Tab = 'visao-geral' | 'alertas' | 'mapa' | 'camadas' | 'config'
+type Tab = 'visao-geral' | 'alertas' | 'mapa' | 'satelite' | 'camadas' | 'config'
 
 const TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: 'visao-geral', label: 'Visão Geral', icon: '📊' },
   { key: 'alertas', label: 'Alertas', icon: '🔔' },
   { key: 'mapa', label: 'Mapa', icon: '🗺️' },
+  { key: 'satelite', label: 'Satélite', icon: '🛰️' },
   { key: 'camadas', label: 'Camadas', icon: '📐' },
   { key: 'config', label: 'Config', icon: '⚙️' },
 ]
@@ -166,6 +168,8 @@ export default function CarDetailPage() {
         {tab === 'alertas' && <AlertsPanel carId={carId} />}
 
         {tab === 'mapa' && <CarMap car={car} alerts={alerts} />}
+
+        {tab === 'satelite' && <SatelliteTab car={car} carId={carId} />}
 
         {tab === 'camadas' && (
           <div className="glass-card overflow-x-auto">

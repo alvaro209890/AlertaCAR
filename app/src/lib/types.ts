@@ -53,3 +53,31 @@ export interface CarDetail {
   sobreposicoes: CarSobreposicao[]
   conformidade: Conformidade
 }
+
+export interface SatelliteDefDto {
+  id: string; label: string; years: number[]
+}
+
+export interface SatelliteCapabilities {
+  bbox: [number, number, number, number]
+  satellites: SatelliteDefDto[]
+  ndviSatelliteId: string
+  ndviAvailableYears: number[]
+}
+
+export interface NdviYearResult {
+  year: number
+  meanNdvi: number | null
+  minNdvi: number | null
+  maxNdvi: number | null
+  pctVegetacao: number | null
+  sampledPoints: number
+  attemptedPoints: number
+  cached: boolean
+}
+
+export interface NdviTrendResult {
+  points: NdviYearResult[]
+  deltaNdvi: number | null
+  classificacao: 'recuperando' | 'estavel' | 'perdendo_vegetacao' | 'indeterminado'
+}

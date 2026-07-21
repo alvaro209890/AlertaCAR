@@ -6,18 +6,18 @@
 
 ---
 
-## 0. Estado real (auditado em 21/07/2026, atualizado após Fases 4 e 5)
+## 0. Estado real (auditado em 21/07/2026, atualizado após Fases 4, 5 e 6)
 
 O que está **de fato implementado em código** (não só documentado):
 
 | Camada | Implementado | Ainda não existe |
 |--------|--------------|------------------|
-| **Backend** | Auth local, CRUD de CARs (+ apelido), SCCON, cron diário (SCCON + Fase 4), `/api/admin/stats`. **Fase 4**: motor WFS de interseção, camadas do CAR + conformidade de ARL, embargos/desembargos/infrações/notificações/autorizações/licenciamento (urgência)/sobreposições fundiárias. **Fase 5**: severidade calculada (`lib/severity.ts`), workflow de status/notas por alerta (`PATCH /api/alerts/:id`), listagem paginada+filtrada (`GET /api/cars/:id/alerts`) — 56 testes no total, tudo validado ao vivo | Downloads, satélite/NDVI, WhatsApp/Baileys, fila de notificação, IA |
-| **App cliente** | Login, Cadastro, Dashboard (carteira simples, link p/ detalhe). **Fase 5**: página `/dashboard/cars/:id` real com 5 abas (Visão Geral, Alertas, Mapa, Camadas, Config) — reestruturado em `lib/`/`components/`/`pages/`, mapa Leaflet com camadas SEMA ao vivo, workflow de triagem de alertas, apelido | Satélite/NDVI, IA, documentos, exports, PWA, carteira avançada |
+| **Backend** | Auth local, CRUD de CARs (+ apelido), SCCON, cron diário (SCCON + Fase 4), `/api/admin/stats`. **Fase 4**: motor WFS de interseção, camadas do CAR + conformidade de ARL, embargos/desembargos/infrações/notificações/autorizações/licenciamento (urgência)/sobreposições fundiárias. **Fase 5**: severidade calculada (`lib/severity.ts`), workflow de status/notas por alerta (`PATCH /api/alerts/:id`), listagem paginada+filtrada (`GET /api/cars/:id/alerts`). **Fase 6**: catálogo real de satélites, `frame` (URL de GetMap recortado), NDVI real amostrado via `GetFeatureInfo` (com cache) e tendência multi-ano — 74 testes no total, tudo validado ao vivo | Downloads, WhatsApp/Baileys, fila de notificação, IA, GIF/MP4 de timelapse |
+| **App cliente** | Login, Cadastro, Dashboard (carteira simples, link p/ detalhe). **Fase 5**: página `/dashboard/cars/:id` real com 5 abas (Visão Geral, Alertas, Mapa, Camadas, Config) — reestruturado em `lib/`/`components/`/`pages/`, mapa Leaflet com camadas SEMA ao vivo, workflow de triagem de alertas, apelido. **Fase 6**: 6ª aba **Satélite** — timelapse por slider+play, split-view, gráfico de tendência NDVI (Recharts) | IA, documentos, exports, PWA, carteira avançada |
 | **Admin** | Placeholder mínimo (154 linhas) | Todo o painel |
 
-**Tradução:** Fases 1–5 com backend e frontend core funcionando de ponta a ponta contra dados reais.
-O restante da documentação é **visão** das Fases 6–13, ainda não codificada.
+**Tradução:** Fases 1–6 com backend e frontend core funcionando de ponta a ponta contra dados reais.
+O restante da documentação é **visão** das Fases 7–13, ainda não codificada.
 
 ### Persona-alvo (decisão do produto)
 **Consultor / Engenheiro florestal** — profissional que gerencia dezenas/centenas de imóveis de clientes.
@@ -194,34 +194,65 @@ A página mais rica do app. Rota `/dashboard/cars/:id` com abas:
 
 ---
 
-## Fase 6 — Satélite / NDVI / Timelapse 🛰️🌿
+## Fase 6 — Satélite / NDVI / Timelapse 🛰️🌿 ✅ core pronto (validado ao vivo em 21/07/2026)
 
-> **Verificado ao vivo:** WMS SEMA tem **53 camadas de imagem** — Landsat 5 desde **1984**, Sentinel-2
-> RGB 2016–2025, Sentinel-2 **NIR** 2016–2020 (NDVI), SPOT, RESOURCESAT 2012, ALOS PALSAR DEM. Isso dá
-> **~40 anos** de timelapse (não só 2016+). Detalhes em [CAMADAS-SEMA.md §3](./CAMADAS-SEMA.md).
+> **Verificado ao vivo:** WMS SEMA tem **53 camadas de imagem** — Landsat 5 **1984–2011** (exceto
+> 2001/2002), Landsat 7 (2002), Landsat 8 **2013–2018**, Sentinel-2 RGB **2016–2025** (10 anos, não só
+> até 2020), SPOT, RESOURCESAT 2012, ALOS PALSAR DEM. Isso dá **~40 anos** de timelapse. Catálogo real
+> embutido em `backend/src/services/satellite.ts` (`SATELLITE_CATALOG`).
 >
-> **Alta resolução extra:** consumir também o acervo próprio do GeoForest — **CBERS-4A/WPM 2 m** e Landsat
-> publicados em `https://wms.cursar.space/geoserver/cbers/wms` (mesmo protocolo WMS). Ver [REUSO-GEOFOREST.md §3](./REUSO-GEOFOREST.md).
+> ⚠️ **Descoberta importante durante a implementação — corrige a Fase 6 original:**
+> 1. **WCS está desabilitado** no GeoServer da SEMA (`Service WCS is disabled`) — não dá pra baixar banda
+>    bruta em GeoTIFF como o plano original presumia.
+> 2. O suposto "layer NIR" (`Mosaicos:Geoportal_Sentinel_2_<ano>_NIR`) **não é um layer separado — é um
+>    STYLE** do layer RGB normal, e esse style **retorna a MESMA imagem** do estilo padrão (confirmado
+>    comparando hash MD5 do PNG com/sem `STYLES=..._NIR` — idênticos). Ou seja, **não existe falsa-cor NIR
+>    de verdade nesse servidor**, ao contrário do que a Fase 6 original assumia.
+> 3. **Alternativa real que funciona**: `GetFeatureInfo` no layer Sentinel-2 RGB devolve as **4 bandas
+>    brutas por pixel** (ex.: `MOSAICO_SENTINEL2_2016_0..3`). Testado ao vivo: pixel de floresta densa →
+>    banda 3 (2338) muito acima das demais (938–989) = NIR; pixel urbano → bandas quase iguais (1393–1521).
+>    Isso permite **NDVI real por amostragem de pixel** (banda 3 = NIR, banda 2 = RED), só que é um índice
+>    relativo/não-calibrado (o mosaico já vem processado 8/16-bit pela SEMA) — bom para comparar o MESMO
+>    imóvel ano a ano, não pra comparar com NDVI de outra fonte.
+> 4. A nomenclatura das propriedades do `GetFeatureInfo` **muda de ano pra ano**
+>    (`MOSAICO_SENTINEL2_2016_N` vs `MOSAICO_SENTINEL_2_2024_N`) — o parser casa pelo **sufixo numérico**
+>    (`_0`.._3`), não pelo prefixo, pra não quebrar com essa inconsistência do servidor.
+>
+> Isso também muda a arquitetura: como o navegador já renderiza WMS ao vivo (Leaflet `WMSTileLayer`,
+> igual à Fase 5), **não existe endpoint de "frame" no sentido de imagem-servida-pelo-backend para o
+> timelapse/comparação** — o front pede a camada direto da SEMA, como a aba Mapa já faz. O backend só
+> entra onde é insubstituível: **cálculo de NDVI** (precisa de valor de pixel, que só sai por
+> `GetFeatureInfo`, não por um tile já renderizado).
 
 ### 6.1 Backend satélite
-- [ ] `GET /api/cars/:id/satellite/capabilities` — satélites e anos disponíveis
-- [ ] `GET .../satellite/frame?sat=&year=&format=png|geotiff` — frame único (WMS `GetMap` recortado no bbox do CAR)
-- [ ] `GET .../satellite/timelapse?sat=&from=&to=` — GIF/MP4 animado
-- [ ] `GET .../satellite/compare?sat1=&year1=&sat2=&year2=` — split-view
-- [ ] `GET .../satellite/ndvi?year=` — mapa NDVI + estatística por polígono
-- [ ] `GET .../satellite/analysis?from=&to=` — diff de NDVI (delega score/parecer à IA — Fase 7)
+- [x] `GET /api/cars/:id/satellite/capabilities` — catálogo real de satélites/anos + bbox do imóvel
+- [x] `GET .../satellite/frame?sat=&year=` — monta a URL do WMS `GetMap` recortado no bbox (formato simplificado: sempre PNG; sem GeoTIFF)
+- [x] `GET .../satellite/ndvi?year=&force=` — amostra NDVI real via grade de pontos + `GetFeatureInfo` dentro do polígono do CAR (cache em `car_ndvi`, `force=true` ignora cache)
+- [x] `GET .../satellite/ndvi-trend?years=` — tendência multi-ano (default: 2016/2019/2021/2023/2025) + classificação (recuperando/estável/perdendo vegetação)
+- [ ] `GET .../satellite/timelapse` (GIF/MP4 animado) — **não implementado**: o timelapse "ao vivo" no front (slider + play trocando de camada WMS) cobre o mesmo caso de uso sem precisar gerar/armazenar vídeo no servidor
+- [ ] `GET .../satellite/compare` como endpoint dedicado — **não necessário**: o split-view é 100% front-end (duas `WMSTileLayer` lado a lado), não precisa de rota própria
+- [ ] `GET .../satellite/analysis` (diff de NDVI com parecer da IA) — adiado pra Fase 7 (depende da fundação de IA)
 
-### 6.2 Frontend satélite (aba)
-- [ ] **Timelapse profundo (1984→2025)**: slider de anos, play 1-5 fps, miniaturas por ano, polígono sobreposto; alternar entre Landsat 5, Sentinel-2 e **CBERS-4A 2 m** (acervo GeoForest)
-- [ ] **Comparação split-view**: satélites/anos diferentes por lado, slider arrastável, zoom sincronizado
-- [ ] **NDVI**: usa `Mosaicos:Geoportal_Sentinel_2_<ano>_NIR` → NDVI=(NIR−RED)/(NIR+RED); falsa-cor + gráfico de tendência + estatísticas (médio 2016 vs atual, % de perda)
-- [ ] **Overlay multi-camada**: base + polígono + alertas + embargos + TI/UC + desmate histórico SEMA (2012–2018)
-- [ ] Downloads: PNG / GeoTIFF / GIF / laudo NDVI (CSV)
+### 6.2 Frontend satélite (aba `🛰️ Satélite` na página do CAR)
+- [x] **Timelapse por slider**: seleciona satélite (Landsat 5/7/8, Sentinel-2, RESOURCESAT, SPOT), slider de índice de ano (lida com anos não-contínuos, ex. Landsat 5 pula 2001/2002), ▶️ play trocando de ano a cada ~900ms, polígono do CAR sobreposto
+- [x] **Comparação split-view**: dois mapas lado a lado (mesmo satélite, anos diferentes) — sem sincronização de zoom/pan entre os dois (cada mapa é independente; sincronizar arrasto ficou fora do escopo desta rodada)
+- [x] **NDVI real**: gráfico de tendência (Recharts) com NDVI médio por ano, linha de referência do limiar de vegetação, badge de classificação (recuperando/estável/perdendo vegetação) + disclaimer de metodologia (pontos amostrados, não é NDVI calibrado)
+- [ ] **Falsa-cor NIR** — **não implementável** neste servidor (ver descoberta acima: o style não existe de fato)
+- [ ] **Overlay multi-camada** dentro da aba satélite (embargos/TI/UC sobre o timelapse) — a aba Mapa (Fase 5) já cobre isso; não duplicado aqui
+- [ ] Downloads (PNG/GeoTIFF/GIF/CSV) — não implementado nesta rodada
 
-### 6.3 Página de Análise Temporal (`/dashboard/timelapse/:id`)
-- [ ] Gráfico de área desmatada por ano + recordes + tendência/projeção
-- [ ] Linha do tempo de eventos (cadastro, queimadas, cortes) cruzada com satélite
-- [ ] Botão "Gerar laudo histórico (PDF)" (usa Fase 9)
+### 6.3 Página de Análise Temporal dedicada (`/dashboard/timelapse/:id`)
+- [ ] Não implementada como página própria — o timelapse e a tendência de NDVI vivem dentro da aba Satélite da página do CAR (mais simples de navegar, sem rota nova)
+- [ ] Linha do tempo de eventos cruzada com satélite / laudo PDF — depende da Fase 9 (relatórios)
+
+**Testes**: 18 testes novos (`satellite.test.ts`) cobrindo catálogo, bbox com margem, parsing de bandas
+(incluindo a inconsistência de nomenclatura por ano), cálculo de NDVI (floresta vs. urbano), grade de
+amostragem e classificação de tendência — **74 testes no total** no backend, todos passando.
+
+**Validado ao vivo** (CAR real MT8019/2017, 1160 ha, bioma Amazônia): NDVI médio 2024 = 0,74 (88,9% dos
+pontos amostrados acima do limiar de vegetação — consistente com imóvel majoritariamente florestado);
+tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, classificada "estável"
+(+0,046); cache confirmado (1ª chamada ~5,4s, repetição ~0,05s); `force=true` recalcula ignorando cache.
 
 ---
 

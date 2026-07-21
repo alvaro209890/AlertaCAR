@@ -56,6 +56,13 @@ servidas por `https://wms.cursar.space/geoserver/cbers/wms`. O AlertaCAR **conso
 mapa/timelapse — não precisa reimplementar o pipeline de download para ter alta resolução.
 (Se um dia quiser gerar imagem nova sob demanda, os módulos `cbers-wpm.ts`/`landsat.ts` estão prontos.)
 
+> ⚠️ **Status real (21/07/2026)**: a implementação da Fase 6 do AlertaCAR usou só o WMS **nativo da SEMA**
+> (Landsat/Sentinel-2, 1984–2025) — o acervo CBERS-4A/WPM 2m do GeoForest **ainda não foi consumido**.
+> Ficou fora do escopo desta rodada pra priorizar entregar o timelapse + NDVI real (a parte tecnicamente
+> mais incerta — WCS desabilitado, "layer NIR" não existe de verdade, ver [CAMADAS-SEMA.md](./CAMADAS-SEMA.md)).
+> Consumir `wms.cursar.space/geoserver/cbers/wms` como satélite extra no catálogo é um bom próximo passo
+> incremental (só adicionar entradas em `SATELLITE_CATALOG`/`layerNameForSatellite`, mesmo protocolo WMS).
+
 ### 4. IA aterrada (Fase 7) — `knowledge-base.ts`
 RAG próprio com 29 arquivos (SEMA-MT, SIMCAR, Código Florestal, SNUC, crimes ambientais, Código Ambiental MT,
 engenharia florestal — APP/RL/PMFS/PRAD, matrizes de decisão, sensoriamento remoto, TR SEMA 2024).

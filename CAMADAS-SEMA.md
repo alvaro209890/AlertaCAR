@@ -89,16 +89,31 @@ Alimenta a **aba Satélite** (timelapse, comparador, NDVI). Todas com `authkey` 
 
 | Satélite | Camadas | Período | Uso |
 |----------|---------|---------|-----|
-| **Landsat 5** | `Mosaicos:LANDSAT_5_1984` … `_2011` | 1984–2011 (28 anos!) | Base histórica profunda |
-| **Landsat 7/8** | `Mosaicos:LANDSAT_7_*`, `LANDSAT_8_*`, `semamt:LANDSAT_5` | 2002, 2013–2018 | Transição |
+| **Landsat 5** | `Mosaicos:LANDSAT_5_1984` … `_2011` (exceto 2001/2002) | 1984–2011 (26 anos) | Base histórica profunda |
+| **Landsat 7** | `Mosaicos:LANDSAT_7_2002` | 2002 | Transição |
+| **Landsat 8** | `Mosaicos:LANDSAT_8_2013` … `_2018` | 2013–2018 | Transição |
 | **Sentinel-2 RGB** | `Mosaicos:SENTINEL_2_2016` … `_2025` | 2016–2025 (10 m) | Timelapse recente |
-| **Sentinel-2 NIR** ⭐ | `Mosaicos:Geoportal_Sentinel_2_2016_NIR` … `_2020_NIR` | 2016–2020 | **NDVI** (NIR/RED) |
 | **SPOT** | `Mosaicos:MOSAICO_SPOT_SEPLAN` | mosaico estadual (5 m) | Detalhe |
 | **RESOURCESAT** | `Mosaicos:RESOURCESAT_2012` | 2012 (23 m) | Complemento |
 | **DEM** | `SEMAMT:ALOS_PALSAR_DEM` | — | Relevo/declividade |
 
 > **Timelapse profundo:** com Landsat 5 desde 1984 + Sentinel-2 até 2025, dá para mostrar **~40 anos**
 > de evolução do imóvel — muito além do que a documentação antiga (só 2016+) prometia.
+
+> ⚠️ **Correção (Fase 6, 21/07/2026):** o `Mosaicos:Geoportal_Sentinel_2_<ano>_NIR` listado aqui em
+> versões anteriores deste documento **não é um layer separado com banda NIR** — é um **STYLE** do
+> próprio layer `SENTINEL_2_<ano>`, e esse style retorna a **mesma imagem RGB** do padrão (confirmado
+> comparando hash MD5 do PNG gerado com e sem `STYLES=..._NIR` — idênticos). **Não existe falsa-cor NIR
+> de verdade neste GeoServer.** Além disso o **WCS está desabilitado** (`Service WCS is disabled`), então
+> não há como baixar a banda bruta em GeoTIFF.
+>
+> O que **funciona de verdade** para NDVI: `GetFeatureInfo` no layer `SENTINEL_2_<ano>` devolve as 4
+> bandas brutas por pixel (ex.: `MOSAICO_SENTINEL2_2016_0..3`) — testado ao vivo: pixel de floresta densa
+> tem a banda 3 muito acima das demais (NIR), pixel urbano tem as 4 bandas próximas. Isso permite um
+> **NDVI real por amostragem de pixel** (banda 3 = NIR, banda 2 = RED), implementado em
+> `backend/src/services/satellite.ts` (Fase 6). A chave de propriedade muda de nome por ano
+> (`MOSAICO_SENTINEL2_2016_N` vs `MOSAICO_SENTINEL_2_2024_N`) — o parser casa pelo sufixo numérico, não
+> pelo prefixo.
 
 ### Acervo próprio de alta resolução (via GeoForest) 🆕
 Além do WMS da SEMA, o **GeoForest** publica acervo próprio no GeoServer local, exposto em

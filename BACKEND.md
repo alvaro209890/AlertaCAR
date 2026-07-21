@@ -25,6 +25,7 @@ backend/
 │   │   ├── cars.ts                # CRUD + WFS lookup + PATCH nickname
 │   │   ├── alerts.ts              # 🆕 GET filtrado+paginado, PATCH status/notas (Fase 5.4)
 │   │   ├── sema-monitor.ts        # 🆕 Força verificação multicamada (Fase 4)
+│   │   ├── satellite.ts           # 🆕 Capabilities/frame/NDVI/tendência (Fase 6)
 │   │   └── admin.ts               # stats, users, whatsapp
 │   ├── services/
 │   │   ├── sccon.ts               # Token + search + detalhes
@@ -33,6 +34,7 @@ backend/
 │   │   ├── wfs-car-layers.ts      # 🆕 Camadas do CAR (ARL/APP/AVN/AUAS/...) + bioma + conformidade ARL — Fase 4
 │   │   ├── wfs-sema-monitor.ts    # 🆕 Embargos/desembargos/infrações/notificações/licenças/autorizações/fundiário — Fase 4
 │   │   ├── car-monitor.ts         # 🆕 Orquestra todas as fontes Fase 4 por CAR (independente, dedup, upsert)
+│   │   ├── satellite.ts           # 🆕 Catálogo de satélites + NDVI real via GetFeatureInfo (Fase 6)
 │   │   ├── whatsapp.ts            # Baileys connect + send (Fase 10 — não implementado)
 │   │   ├── notification.ts        # Fila + rate limiting (Fase 10 — não implementado)
 │   │   └── car-importer.ts        # nº CAR → formato WFS → polígono
@@ -93,21 +95,29 @@ Ver `ARQUITETURA.md` para schema completo.
 | GET | `/api/cars/:id/alerts/export?format=csv\|geojson\|json` | Baixar alertas |
 | GET | `/api/cars/:id/report?format=pdf\|html` | Relatório da propriedade |
 
-### Satélite (autenticado) 🛰️ 🆕
+### Satélite (autenticado) 🛰️ — Fase 6 ✅ core pronto
 
-A SEMA disponibiliza **43 camadas WMS de satélite** via GeoServer:
-Landsat 5 (1984-2011), Landsat 7 (2002), Landsat 8 (2013-2018),
-Sentinel-2 RGB (2016-2025), Sentinel-2 NIR/NDVI (2016-2025),
-SPOT, RESOURCESAT.
+A SEMA disponibiliza **53 camadas WMS de satélite** via GeoServer: Landsat 5 (1984–2011, exceto
+2001/2002), Landsat 7 (2002), Landsat 8 (2013–2018), Sentinel-2 RGB (2016–2025), SPOT, RESOURCESAT
+(catálogo real em `backend/src/services/satellite.ts`, `SATELLITE_CATALOG`).
+
+⚠️ **Não existe Sentinel-2 NIR de verdade neste servidor** — o que a Fase 6 original chamava de "layer
+NIR" é na verdade um *style* que devolve a mesma imagem RGB (confirmado por hash MD5 idêntico), e o WCS
+(que daria banda bruta em GeoTIFF) está desabilitado no GeoServer. O NDVI abaixo é calculado por
+amostragem de pixel via `GetFeatureInfo` (banda 3 = NIR, banda 2 = RED, confirmado ao vivo), não por
+um layer de falsa-cor. Ver [CAMADAS-SEMA.md §3](./CAMADAS-SEMA.md) para os detalhes da descoberta.
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/api/cars/:id/satellite/capabilities` | Listar satélites e anos disponíveis |
-| GET | `/api/cars/:id/satellite/timelapse?sat=sentinel&from=2016&to=2025` | Gerar GIF animado do timelapse |
-| GET | `/api/cars/:id/satellite/compare?sat1=landsat8&year1=2017&sat2=sentinel&year2=2024` | Imagem split-view antes/depois |
-| GET | `/api/cars/:id/satellite/ndvi?year=2024` | Mapa NDVI + dados numéricos (CSV) |
-| GET | `/api/cars/:id/satellite/frame?sat=sentinel&year=2024&format=png\|geotiff` | Frame único |
-| GET | `/api/cars/:id/satellite/analysis?from=2023&to=2024` | Análise automática de mudança (diferença NDVI) |
+| GET | `/api/cars/:id/satellite/capabilities` | Catálogo real de satélites/anos + bbox do imóvel (com margem) |
+| GET | `/api/cars/:id/satellite/frame?sat=&year=` | Monta a URL do WMS `GetMap` recortado no bbox (sempre PNG) |
+| GET | `/api/cars/:id/satellite/ndvi?year=&force=` | NDVI amostrado (grade de pontos + `GetFeatureInfo`, cache em `car_ndvi`; `force=true` recalcula) |
+| GET | `/api/cars/:id/satellite/ndvi-trend?years=2016,2019,2021,2023,2025` | Tendência multi-ano + `deltaNdvi` + `classificacao` (`recuperando`/`estavel`/`perdendo_vegetacao`) |
+
+**Não implementado nesta rodada**: GIF/MP4 de timelapse (o front já resolve isso com slider+play trocando
+de camada WMS ao vivo, sem precisar gerar vídeo no servidor), endpoint dedicado de `compare` (o split-view
+é só duas `WMSTileLayer` lado a lado no front, não precisa de rota própria), downloads (PNG/GeoTIFF/CSV),
+`analysis` com parecer de IA (adiado pra Fase 7, que ainda não existe).
 
 ### Alertas (autenticado) — Fase 5.4 ✅
 
@@ -246,6 +256,29 @@ Camadas e campos reais confirmados ao vivo em 21/07/2026 — ver [CAMADAS-SEMA.m
 independente), salva achados como `alerts` com dedup por `(car_id, source, source_id)`, faz
 upsert em `car_layers`/`car_licenses`/`car_sobreposicoes`, e recalcula a conformidade de ARL
 na tabela `cars`. `monitorAllCarsMultilayer()` roda para todos os CARs ativos (uso do cron).
+
+## Serviço de satélite/NDVI (Fase 6) 🆕
+
+### `satellite.ts`
+```typescript
+SATELLITE_CATALOG              // catálogo real (id, label, years[], layerForYear) — 6 satélites
+bboxForGeometry(geometry, pad) // bbox do polígono + margem (padrão 15%)
+buildFrameUrl(layer, bbox)     // URL do WMS GetMap recortado (front usa direto, mas útil p/ debug/export futuro)
+sampleNdviForYear(geometry, year, opts?)
+  // 1. gera grade de pontos dentro do bbox (padrão 8×8, teto 40 pontos)
+  // 2. mantém só os pontos DENTRO do polígono (turf booleanPointInPolygon)
+  // 3. GetFeatureInfo por ponto (concorrência 5, bbox de ~30m ao redor do ponto)
+  // 4. parseBandsFromFeatureInfo() casa bandas pelo SUFIXO numérico (_0.._3) — a chave muda de
+  //    nome por ano (MOSAICO_SENTINEL2_2016_N vs MOSAICO_SENTINEL_2_2024_N), confirmado ao vivo
+  // 5. ndviFromBands(): NDVI = (banda3 − banda2) / (banda3 + banda2)  — NIR=banda3, RED=banda2
+  // 6. agrega: meanNdvi, minNdvi, maxNdvi, pctVegetacao (% de pontos com NDVI > 0,3)
+classifyTrend(deltaNdvi)       // 'recuperando' (>+0,05) / 'perdendo_vegetacao' (<-0,05) / 'estavel' / 'indeterminado'
+```
+Resultado por ano é cacheado na tabela `car_ndvi` (`UNIQUE(car_id, year)`) pela rota — evitar reamostrar
+o mesmo ano toda vez é importante porque o servidor da SEMA é lento/instável sob carga repetida (mesmo
+padrão de flakiness já observado na Fase 4). 18 testes unitários (`satellite.test.ts`) cobrem parsing
+de bandas, cálculo de NDVI (com valores reais de floresta vs. urbano capturados ao vivo) e classificação
+de tendência. Validado ao vivo: ver tabela de testes de integração no [README](./README.md).
 
 ## Cron (`cron/monitor.ts`)
 
