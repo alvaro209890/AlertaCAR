@@ -75,14 +75,31 @@ Ver `ARQUITETURA.md` para schema completo.
 | GET | `/api/cars` | Listar CARs (com último alerta) |
 | POST | `/api/cars` | `{carNumber}` → busca WFS → salva |
 | GET | `/api/cars/:id` | Detalhes + GeoJSON + alertas |
-| DELETE | `/api/cars/:id` | Parar monitoramento |
-| POST | `/api/cars/:id/check` | Forçar consulta agora |
+| DELETE | `/api/cars/:id` | Parar monitoramento (soft delete) |
+| PATCH | `/api/cars/:id/refresh` | Forçar re-consulta WFS |
+
+### Downloads (autenticado) 🆕
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/api/cars/:id/export?format=geojson\|shp\|kml` | Baixar polígono do CAR |
+| GET | `/api/cars/:id/alerts/export?format=csv\|geojson\|json` | Baixar alertas |
+| GET | `/api/cars/:id/report?format=pdf\|html` | Relatório da propriedade |
+| GET | `/api/cars/:id/satellite?date=YYYY-MM-DD` | Imagem de satélite |
 
 ### Alertas (autenticado)
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/api/cars/:id/alerts` | Listar alertas (filtro por source, período) |
+
+### SCCON (autenticado)
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/api/sccon/config` | Classes de alerta disponíveis |
+| POST | `/api/sccon/check/:carId` | Forçar verificação manual de um CAR |
+| POST | `/api/sccon/check-all` | Admin: forçar verificação de todos |
 
 ### Admin (requireAdmin)
 
@@ -91,12 +108,18 @@ Ver `ARQUITETURA.md` para schema completo.
 | GET | `/api/admin/stats` | Cards do dashboard |
 | GET | `/api/admin/users` | Listar usuários |
 | PUT | `/api/admin/users/:id` | Ativar/desativar |
-| GET | `/api/admin/cron/status` | Último cron |
-| POST | `/api/admin/cron/run` | Executar agora |
+| GET | `/api/admin/sccon/logs` | Log de execuções do cron |
+| POST | `/api/admin/sccon/cron/start` | Iniciar cron |
+| POST | `/api/admin/sccon/cron/stop` | Parar cron |
+| GET | `/api/admin/cars/export?format=csv\|geojson` | Exportar CARs 🆕 |
+| GET | `/api/admin/alerts/export?format=csv\|geojson` | Exportar alertas 🆕 |
+| GET | `/api/admin/users/export?format=csv` | Exportar usuários 🆕 |
 | GET | `/api/admin/notifications` | Log envios WhatsApp |
 | GET | `/api/admin/whatsapp/status` | `{connected, phone, uptime}` |
 | GET | `/api/admin/whatsapp/qr` | QR Code base64 |
 | POST | `/api/admin/whatsapp/reconnect` | Forçar reconexão |
+| POST | `/api/admin/reports/generate` | Gerar relatório PDF 🆕 |
+| GET | `/api/admin/database/backup` | Backup do banco (.db) 🆕
 
 ## Serviço SCCON (`sccon.ts`)
 
