@@ -271,9 +271,9 @@ Tabela com toolbar:
 │  Exportação de dados                                       │
 │                                                          │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ 📥 Exportar CARs (GeoJSON)                         │   │
-│  │ [Todos os CARs ▼]  Formato: [GeoJSON ▼]           │   │
-│  │ [📥 Exportar]        Inclui: geometria + atributos │   │
+│  │ 📥 Exportar CARs (Shapefile .zip)                  │   │
+│  │ [Todos os CARs ▼]  Formato: [Shapefile ▼]          │   │
+│  │ [📥 Exportar]        Inclui: .shp + .dbf + .shx    │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                          │
 │  ┌──────────────────────────────────────────────────┐   │
@@ -379,7 +379,7 @@ Na página de configurações, card "Métricas do servidor":
 
 | Dado | Formatos | Endpoint |
 |------|----------|----------|
-| Lista de CARs | CSV, JSON, GeoJSON | `GET /api/admin/cars/export` |
+| Lista de CARs | Shapefile (.zip) | `GET /api/admin/cars/export?format=shp` |
 | Lista de usuários | CSV, JSON | `GET /api/admin/users/export` |
 | Alertas | CSV, GeoJSON | `GET /api/admin/alerts/export` |
 | Log notificações | CSV | `GET /api/admin/notifications/export` |

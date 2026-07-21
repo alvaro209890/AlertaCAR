@@ -82,7 +82,7 @@ Ver `ARQUITETURA.md` para schema completo.
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/api/cars/:id/export?format=geojson\|shp\|kml` | Baixar polígono do CAR |
+| GET | `/api/cars/:id/export?format=shp` | Baixar polígono do CAR (Shapefile .zip) |
 | GET | `/api/cars/:id/alerts/export?format=csv\|geojson\|json` | Baixar alertas |
 | GET | `/api/cars/:id/report?format=pdf\|html` | Relatório da propriedade |
 
@@ -126,7 +126,7 @@ SPOT, RESOURCESAT.
 | GET | `/api/admin/sccon/logs` | Log de execuções do cron |
 | POST | `/api/admin/sccon/cron/start` | Iniciar cron |
 | POST | `/api/admin/sccon/cron/stop` | Parar cron |
-| GET | `/api/admin/cars/export?format=csv\|geojson` | Exportar CARs 🆕 |
+| GET | `/api/admin/cars/export?format=shp` | Exportar CARs (Shapefile .zip) 🆕 |
 | GET | `/api/admin/alerts/export?format=csv\|geojson` | Exportar alertas 🆕 |
 | GET | `/api/admin/users/export?format=csv` | Exportar usuários 🆕 |
 | GET | `/api/admin/notifications` | Log envios WhatsApp |

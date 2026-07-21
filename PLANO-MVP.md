@@ -114,7 +114,7 @@
 - [ ] Aba Config: apelido, preferências de notificação por classe, frequência
 
 ### 4.6 Sistema de Downloads ⭐
-- [ ] `GET /api/cars/:id/export?format=geojson|shp|kml` — polígono
+- [ ] `GET /api/cars/:id/export?format=shp` — polígono (Shapefile .zip)
 - [ ] `GET /api/cars/:id/alerts/export?format=csv|geojson|json` — alertas
 - [ ] `GET /api/cars/:id/report?format=pdf` — relatório PDF
 - [ ] `GET /api/cars/:id/satellite?date=YYYY-MM-DD` — imagem
@@ -176,7 +176,7 @@
 - [ ] **CARs**: tabela com busca, filtro, ações em massa, exportação
 - [ ] **Alertas**: tabela com filtros avançados, reenvio WhatsApp, arquivamento
 - [ ] **Relatórios**: gerador de PDF por CAR/período, agendamento semanal
-- [ ] **Exportações**: CSV/GeoJSON/Shapefile em massa
+- [ ] **Exportações**: CSV/Shapefile em massa
 - [ ] **Métricas do Servidor**: CPU, RAM, disco, serviços rodando
 
 ### 6.2 Gráficos (Recharts)

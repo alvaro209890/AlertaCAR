@@ -321,7 +321,7 @@ Campos:
 │  │ [Ver detalhes →]     │                                     │
 │  └─────────────────────┘                                     │
 │                                                              │
-│  [📥 Baixar polígono (GeoJSON)] [📥 (SHP)] [📥 (KML)]       │
+│  [📥 Baixar polígono (Shapefile .zip)]                         │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -738,7 +738,7 @@ Mini-visualização inline nos cards do dashboard:
 
 | Recurso | Formatos | Rota |
 |---------|----------|------|
-| Polígono do CAR | GeoJSON, SHP (zip), KML | `GET /api/cars/:id/export?format=geojson\|shp\|kml` |
+| Polígono do CAR | Shapefile (.zip) | `GET /api/cars/:id/export?format=shp` |
 | Alertas (todos) | CSV, GeoJSON, JSON | `GET /api/cars/:id/alerts/export?format=csv\|geojson\|json` |
 | Alerta individual | GeoJSON | Botão no card do alerta |
 | Relatório completo | PDF, HTML | `GET /api/cars/:id/report?format=pdf\|html` |
@@ -746,9 +746,9 @@ Mini-visualização inline nos cards do dashboard:
 
 ### UI de download
 - Dropdown "📥 Baixar" em cada seção relevante
-- Opções: GeoJSON | Shapefile | KML | CSV | PDF
+- Opções: Shapefile (.zip) | CSV | PDF
 - Download inicia automaticamente (sem popup extra)
-- Toast "✅ Arquivo baixado: CAR_MT27827.geojson"
+- Toast "✅ Arquivo baixado: CAR_MT27827.zip"
 
 ---
 
