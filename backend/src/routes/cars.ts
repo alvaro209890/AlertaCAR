@@ -122,9 +122,35 @@ router.get('/:id', (req: AuthRequest, res) => {
       SELECT * FROM alerts WHERE car_id = ? ORDER BY detected_date DESC LIMIT 20
     `).all(carId) as any[]
 
+    const layers = db.prepare(`
+      SELECT layer_key, label, area_ha, feature_count, extra_json, updated_at
+      FROM car_layers WHERE car_id = ? ORDER BY layer_key
+    `).all(carId) as any[]
+
+    const licenses = db.prepare(`
+      SELECT tipo, numero_titulo, razao_social, data_aprovacao, data_vencimento, urgencia, updated_at
+      FROM car_licenses WHERE car_id = ? ORDER BY data_vencimento
+    `).all(carId) as any[]
+
+    const sobreposicoes = db.prepare(`
+      SELECT tipo, nome, intersection_ha, coverage_percent, updated_at
+      FROM car_sobreposicoes WHERE car_id = ? ORDER BY coverage_percent DESC
+    `).all(carId) as any[]
+
     res.json({
       car: formatCar(car),
       alerts: alerts.map(formatAlert),
+      layers: layers.map(formatLayer),
+      licenses: licenses.map(formatLicense),
+      sobreposicoes: sobreposicoes.map(formatSobreposicao),
+      conformidade: {
+        bioma: car.bioma || null,
+        arlExigidaPercent: car.arl_exigida_percent ?? null,
+        arlExigidaHa: car.arl_exigida_ha ?? null,
+        arlDeclaradaHa: car.arl_declarada_ha ?? null,
+        deficitArlHa: car.deficit_arl_ha ?? null,
+        layersUpdatedAt: car.layers_updated_at || null,
+      },
     })
   } catch (err: any) {
     console.error('[cars] GET/:id error:', err)
@@ -220,6 +246,39 @@ function formatCar(row: any) {
     lastCheckAt: row.last_check_at,
     active: row.active,
     createdAt: row.created_at,
+  }
+}
+
+function formatLayer(row: any) {
+  return {
+    key: row.layer_key,
+    label: row.label,
+    areaHa: row.area_ha,
+    featureCount: row.feature_count,
+    extra: row.extra_json ? JSON.parse(row.extra_json) : null,
+    updatedAt: row.updated_at,
+  }
+}
+
+function formatLicense(row: any) {
+  return {
+    tipo: row.tipo,
+    numeroTitulo: row.numero_titulo,
+    razaoSocial: row.razao_social,
+    dataAprovacao: row.data_aprovacao,
+    dataVencimento: row.data_vencimento,
+    urgencia: row.urgencia,
+    updatedAt: row.updated_at,
+  }
+}
+
+function formatSobreposicao(row: any) {
+  return {
+    tipo: row.tipo,
+    nome: row.nome,
+    intersectionHa: row.intersection_ha,
+    coveragePercent: row.coverage_percent,
+    updatedAt: row.updated_at,
   }
 }
 

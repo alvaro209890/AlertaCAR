@@ -178,6 +178,18 @@ Endpoints prontos para portar: `GET /api/wfs/health`, `POST /api/map/intersectio
 - Camadas sem PK quebram paginação com `startIndex` → detectar erro "natural order without a primary key" e cair para uma página única grande.
 - Timeout alto (60 s) + retry; `authkey` obrigatória.
 
+**Pitfall novo confirmado ao vivo em 21/07/2026 (AlertaCAR, Fase 4):**
+- `CQL_FILTER` com **`AND` sem parênteses ao redor de cada condição derruba a conexão**
+  (a requisição nem completa — `HTTP_STATUS=000`, connection reset), mesmo com sintaxe CQL
+  correta e valores confirmados como existentes:
+  ```
+  ❌ CQL_FILTER=NUMERO_CAR='MT8019/2017' AND SITUACAO='ATIVO'         → conexão cai
+  ✅ CQL_FILTER=(NUMERO_CAR='MT8019/2017')AND(SITUACAO='ATIVO')       → 200 OK, 12 feições
+  ```
+  Reproduzido de forma consistente (3+ tentativas) contra `Geoportal:CAR_ARL`. **Sempre
+  parentetizar cada condição** ao combinar filtros com `AND`/`OR` no WFS da SEMA. Implementado
+  em `backend/src/services/wfs-car-layers.ts` (`fetchCarLayerFeatures`).
+
 ---
 
 ## 6. Outras fontes úteis (não-SEMA)

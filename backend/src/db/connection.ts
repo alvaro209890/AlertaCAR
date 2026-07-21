@@ -76,14 +76,71 @@ export function initializeSchema() {
       alerts_found INTEGER DEFAULT 0,
       alerts_sent INTEGER DEFAULT 0,
       errors INTEGER DEFAULT 0,
-      status TEXT DEFAULT 'running'
+      status TEXT DEFAULT 'running',
+      sources_json TEXT
+    );
+
+    -- Fase 4: camadas do próprio CAR (ARL/APP/AVN/AUAS/...) — área por camada
+    CREATE TABLE IF NOT EXISTS car_layers (
+      id TEXT PRIMARY KEY,
+      car_id TEXT NOT NULL REFERENCES cars(id),
+      layer_key TEXT NOT NULL,
+      label TEXT NOT NULL,
+      area_ha REAL NOT NULL DEFAULT 0,
+      feature_count INTEGER NOT NULL DEFAULT 0,
+      extra_json TEXT,
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(car_id, layer_key)
+    );
+
+    -- Fase 4: licenças ambientais ativas (LP/LI/LO/LOP) com vencimento
+    CREATE TABLE IF NOT EXISTS car_licenses (
+      id TEXT PRIMARY KEY,
+      car_id TEXT NOT NULL REFERENCES cars(id),
+      tipo TEXT NOT NULL,
+      numero_titulo TEXT,
+      razao_social TEXT,
+      data_aprovacao TEXT,
+      data_vencimento TEXT,
+      urgencia TEXT,
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(car_id, tipo, numero_titulo)
+    );
+
+    -- Fase 4: sobreposições fundiárias (TI/UC/Assentamentos/Corredores)
+    CREATE TABLE IF NOT EXISTS car_sobreposicoes (
+      id TEXT PRIMARY KEY,
+      car_id TEXT NOT NULL REFERENCES cars(id),
+      tipo TEXT NOT NULL,
+      nome TEXT NOT NULL,
+      intersection_ha REAL NOT NULL DEFAULT 0,
+      coverage_percent REAL NOT NULL DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(car_id, tipo, nome)
     );
 
     CREATE INDEX IF NOT EXISTS idx_cars_user ON cars(user_id, active);
     CREATE INDEX IF NOT EXISTS idx_alerts_car ON alerts(car_id, detected_date);
     CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_alerts_source_id ON alerts(source, source_id);
+    CREATE INDEX IF NOT EXISTS idx_car_layers_car ON car_layers(car_id);
+    CREATE INDEX IF NOT EXISTS idx_car_licenses_car ON car_licenses(car_id);
+    CREATE INDEX IF NOT EXISTS idx_car_sobreposicoes_car ON car_sobreposicoes(car_id);
   `)
+
+  addColumnIfMissing('cars', 'bioma', 'TEXT')
+  addColumnIfMissing('cars', 'arl_exigida_percent', 'REAL')
+  addColumnIfMissing('cars', 'arl_exigida_ha', 'REAL')
+  addColumnIfMissing('cars', 'arl_declarada_ha', 'REAL')
+  addColumnIfMissing('cars', 'deficit_arl_ha', 'REAL')
+  addColumnIfMissing('cars', 'layers_updated_at', 'TEXT')
+}
+
+/** ALTER TABLE ADD COLUMN idempotente (SQLite não suporta "IF NOT EXISTS" em colunas). */
+function addColumnIfMissing(table: string, column: string, type: string): void {
+  const existing = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  if (existing.some((c) => c.name === column)) return
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
 }
 
 export default db

@@ -39,7 +39,7 @@ consultor não precisa logar em 5 sistemas diferentes por imóvel, todo dia, par
 | 1 | ✅ | Auth local + monorepo base |
 | 2 | ✅ | CRUD CARs + WFS SEMA (polígono) |
 | 3 | ✅ | SCCON monitoramento + cron diário |
-| 4 | ⏳ | Fontes expandidas — SEMA multicamada + camadas do CAR + INPE + vizinho |
+| 4 | 🚧 backend pronto | Fontes expandidas — SEMA multicamada + camadas do CAR + conformidade ARL (validado ao vivo); faltam INPE, vizinhança e a UI que consuma os novos dados |
 | 5 | ⏳ | Detalhes do CAR + Mapa + Workflow de alertas |
 | 6 | ⏳ | Satélite / NDVI / Timelapse |
 | 7 | ⏳ | IA robusta (DeepSeek V4 Flash) |
@@ -106,7 +106,8 @@ Banco_de_dados/AlertaCAR/               # Dados (fora do repo)
 | WFS SEMA (135 camadas) | ✅ | Auth key funcional, todas categorizadas |
 | Auth local | ✅ | Register + login + JWT + requireAuth |
 | CRUD CARs | ✅ | POST/GET/DELETE + WFS automático |
-| Cron monitoramento | ✅ | node-cron 06:00 GMT-3 |
+| Cron monitoramento | ✅ | node-cron 06:00 GMT-3 (SCCON + Fase 4) |
+| WFS multicamada (Fase 4) | ✅ | 61 testes unitários + validado ao vivo: CAR real MT8019/2017 → ARL 930,68 ha, bioma Amazônia, déficit ARL zerado, 9 autorizações únicas, 5 camadas do CAR com área |
 
 ## 🚀 Como rodar
 
@@ -121,6 +122,9 @@ cd app && pnpm run dev         # porta 5173
 
 # Terminal 3: Admin
 cd admin && pnpm run dev       # porta 5174
+
+# Testes + typecheck do backend:
+cd backend && pnpm test && pnpm run typecheck
 
 # Promover admin:
 sqlite3 "Banco_de_dados/AlertaCAR/alertacar.db" \

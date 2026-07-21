@@ -137,7 +137,53 @@ CREATE TABLE cars (
   last_check_at TEXT,
   active INTEGER DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now')),
-  UNIQUE(user_id, car_number)
+  UNIQUE(user_id, car_number),
+  -- Conformidade de Reserva Legal (Fase 4 🆕, colunas adicionadas via ALTER TABLE idempotente)
+  bioma TEXT,                        -- 'Amazônia' | 'Cerrado' | 'Pantanal' (Geoportal:BIOMAS_MT)
+  arl_exigida_percent REAL,          -- % mínimo por bioma (Art. 12, Lei 12.651/2012)
+  arl_exigida_ha REAL,               -- area_ha × arl_exigida_percent / 100
+  arl_declarada_ha REAL,             -- soma de Geoportal:CAR_ARL
+  deficit_arl_ha REAL,               -- max(0, arl_exigida_ha - arl_declarada_ha)
+  layers_updated_at TEXT
+);
+
+-- Fase 4 🆕: camadas do próprio CAR (ARL/APP/AVN/AUAS/...) — área por camada
+CREATE TABLE car_layers (
+  id TEXT PRIMARY KEY,
+  car_id TEXT NOT NULL REFERENCES cars(id),
+  layer_key TEXT NOT NULL,           -- 'ARL' | 'APP' | 'APPD' | 'APPRL' | 'AVN' | 'AUAS' | 'AU' | 'NASCENTE' | 'AREA_CONSOLIDADA'
+  label TEXT NOT NULL,
+  area_ha REAL NOT NULL DEFAULT 0,
+  feature_count INTEGER NOT NULL DEFAULT 0,
+  extra_json TEXT,                   -- ex: { maisRecenteAberturaAno } p/ AUAS
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(car_id, layer_key)
+);
+
+-- Fase 4 🆕: licenças ambientais ativas (LP/LI/LO/LOP) com vencimento
+CREATE TABLE car_licenses (
+  id TEXT PRIMARY KEY,
+  car_id TEXT NOT NULL REFERENCES cars(id),
+  tipo TEXT NOT NULL,                -- 'LP' | 'LI' | 'LO' | 'LOP'
+  numero_titulo TEXT,
+  razao_social TEXT,
+  data_aprovacao TEXT,
+  data_vencimento TEXT,
+  urgencia TEXT,                     -- 'ok' | 'atencao_90d' | 'atencao_60d' | 'critica_30d' | 'vencida'
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(car_id, tipo, numero_titulo)
+);
+
+-- Fase 4 🆕: sobreposições fundiárias (TI/UC/Assentamentos/Corredores)
+CREATE TABLE car_sobreposicoes (
+  id TEXT PRIMARY KEY,
+  car_id TEXT NOT NULL REFERENCES cars(id),
+  tipo TEXT NOT NULL,                -- 'TERRA_INDIGENA' | 'UNIDADE_CONSERVACAO' | 'ASSENTAMENTO_INCRA' | ...
+  nome TEXT NOT NULL,
+  intersection_ha REAL NOT NULL DEFAULT 0,
+  coverage_percent REAL NOT NULL DEFAULT 0,
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(car_id, tipo, nome)
 );
 
 -- Alertas detectados (qualquer fonte)
@@ -145,7 +191,7 @@ CREATE TABLE alerts (
   id TEXT PRIMARY KEY,
   car_id TEXT NOT NULL REFERENCES cars(id),
   user_id TEXT NOT NULL REFERENCES users(id),
-  source TEXT NOT NULL,              -- 'sccon' | 'sema_embargo' | 'sema_infracao' | 'sema_licenca' | 'fundiario' | 'cadastral'
+  source TEXT NOT NULL,              -- 'sccon' | 'sema_embargo' | 'sema_desembargo' | 'sema_infracao' | 'sema_notificacao' | 'sema_autorizacao' | 'sema_licenca' | 'fundiario' | 'cadastral'
   source_id TEXT,                    -- ID externo (idt_local_alert, nº auto)
   class_type TEXT,                   -- CUT, EMBARGO, LP, etc.
   title TEXT NOT NULL,

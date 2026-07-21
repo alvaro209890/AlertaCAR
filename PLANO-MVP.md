@@ -6,17 +6,18 @@
 
 ---
 
-## 0. Estado real (auditado em 21/07/2026)
+## 0. Estado real (auditado em 21/07/2026, atualizado após início da Fase 4)
 
 O que está **de fato implementado em código** (não só documentado):
 
 | Camada | Implementado | Ainda não existe |
 |--------|--------------|------------------|
-| **Backend** | Auth local (bcrypt+JWT), CRUD de CARs, `fetchCarPolygon` (WFS `CAR_ATP`), serviço SCCON (`searchAlertsByCar` + dedup + `checkCar`/`checkAllActiveCars`), cron diário 06:00, `/api/admin/stats` | `fetchEmbargos/Infracoes/Licenciamento/Sobreposicoes`, downloads, satélite/NDVI, WhatsApp/Baileys, fila de notificação, IA |
-| **App cliente** | Login, Cadastro, Dashboard (lista de CARs, 3 stats, add/remove, "Verificar SCCON", timeline expansível) — arquivo único `App.tsx` | Página de Detalhes, mapa Leaflet, satélite, workflow de alertas, carteira, IA, perfil, exports, PWA |
+| **Backend** | Auth local (bcrypt+JWT), CRUD de CARs, `fetchCarPolygon` (WFS `CAR_ATP`), serviço SCCON, cron diário 06:00 (SCCON + Fase 4), `/api/admin/stats`. **Fase 4**: motor WFS genérico de interseção, camadas do CAR (ARL/APP/APPD/APPRL/AVN/AUAS/AU/NASCENTE/AREA_CONSOLIDADA) com conformidade de Reserva Legal, embargos/desembargos/infrações/notificações/autorizações/licenciamento (com urgência de vencimento)/sobreposições fundiárias — tudo testado (61 testes) e validado ao vivo contra o WFS real | Downloads, satélite/NDVI, WhatsApp/Baileys, fila de notificação, IA |
+| **App cliente** | Login, Cadastro, Dashboard (lista de CARs, 3 stats, add/remove, "Verificar SCCON", timeline expansível) — arquivo único `App.tsx`. Backend da Fase 4 pronto mas **ainda sem UI** que o consuma | Página de Detalhes, mapa Leaflet, satélite, workflow de alertas, carteira, IA, perfil, exports, PWA |
 | **Admin** | Placeholder mínimo (154 linhas) | Todo o painel |
 
-**Tradução:** Fases 1–3 concluídas de verdade; o restante da documentação anterior era **visão**, não código.
+**Tradução:** Fases 1–3 concluídas; Fase 4 (backend) concluída e validada ao vivo em 21/07/2026 — falta
+só a UI que exiba os novos dados. O restante da documentação era **visão**, não código.
 Este plano reorganiza e **amplia muito** essa visão, com foco no consultor e em IA robusta.
 
 ### Persona-alvo (decisão do produto)
@@ -101,33 +102,33 @@ Objetivo: transformar o AlertaCAR de "monitor de desmate" em **monitor ambiental
 > → `turf.intersect/union` = **ha e % de cada camada dentro do imóvel**. Camadas reais confirmadas ao vivo em
 > [CAMADAS-SEMA.md](./CAMADAS-SEMA.md).
 
-### 4.0 Engine WFS (portar do GeoForest) 🆕
-- [ ] Portar `getCapabilitiesCached`, `getGeometryFieldForLayer`, `computeIntersectionForLayer`, helpers de WKT
-- [ ] Rotas `GET /api/wfs/health` e `POST /api/map/intersection-hectares` (polygon + layerNames → ha/% por camada)
-- [ ] Concorrência limitada (3), timeout 60 s, retry, `authkey` via env
+### 4.0 Engine WFS (portar do GeoForest) ✅
+- [x] Portado `getCapabilitiesCached`, `getGeometryFieldForLayer`, `fetchIntersectingFeatures`/`computeIntersectionHectares` (equivalente a `computeIntersectionForLayer`), helpers de WKT — `backend/src/services/wfs-intersection.ts`
+- [ ] Rotas HTTP `GET /api/wfs/health` e `POST /api/map/intersection-hectares` (engine já existe e é usado internamente por `fetchSobreposicoes`; expor como rota pública fica para quando o front precisar testar camadas ad-hoc)
+- [x] Concorrência limitada (3), timeout 30 s + retry, `authkey` via env — 16 testes unitários, validado ao vivo
 
-### 4.1 SEMA multicamada (fiscalização)
-- [ ] `fetchEmbargos(polygon)` — `TDAD_FISCALIZACAO_TERMO_DE_EMBARGO`, `AREAS_EMBARGADAS_SEMA`, `AREA_EMBARGADA_SIGA_POLIGONO`
-- [ ] `fetchInfracoes(polygon)` — `TDAD_FISCALIZACAO_AUTO_DE_INFRACAO`, `AUTOS_DE_INFRACAO_SIGA_POLIGONO`
-- [ ] `fetchNotificacoes(polygon)` — `TDAD_FISCALIZACAO_NOTIFICACAO`, `_AUTO_DE_INSPECAO`
-- [ ] `fetchDesembargos(polygon)` — `AREAS_DESEMBARGADAS_SEMA`
-- [ ] BBOX + clip local com Turf.js (INTERSECTS não confiável); dedup por nº do auto/termo
+### 4.1 SEMA multicamada (fiscalização) ✅
+- [x] `fetchEmbargos(polygon)` — `Geoportal:AREAS_EMBARGADAS_SEMA` (polígono, rico em campos — preferido a `TDAD_FISCALIZACAO_TERMO_DE_EMBARGO`, que tem só 9 registros pontuais)
+- [x] `fetchInfracoes(polygon)` — `Geoportal:TDAD_FISCALIZACAO_AUTO_DE_INFRACAO` (ponto, BBOX + point-in-polygon)
+- [x] `fetchNotificacoes(polygon)` — `Geoportal:TDAD_FISCALIZACAO_NOTIFICACAO` (ponto)
+- [x] `fetchDesembargos(polygon)` — `Geoportal:AREAS_DESEMBARGADAS_SEMA`
+- [x] INTERSECTS + clip local com Turf.js (polígonos) / BBOX + `booleanPointInPolygon` (pontos); dedup por `(car_id, source, source_id)` — `backend/src/services/wfs-sema-monitor.ts` + `car-monitor.ts`
 
-### 4.2 Licenciamento e autorizações
-- [ ] `fetchLicenciamento(polygon)` — `SIMLAMGEO_LP/LI/LO_ATIVA`, `SIGA_LAC_ATIVA`
-- [ ] Detectar **vencimento** de licença (alerta em 90/60/30 dias)
-- [ ] `fetchAutorizacoes(polygon)` — `AUTORIZACAO_DESMATE_SEMA`, `AUTORIZACAO_EXPLORACAO_SEMA`, `AUTEX_PMFS_SEMA`
-- [ ] Guardar autorizações no banco para **cruzamento com alertas** (ver 5.4)
+### 4.2 Licenciamento e autorizações ✅
+- [x] `fetchLicenciamento(polygon)` — `SIMLAMGEO_LP/LI/LO/LOP_ATIVA` (ponto; `SIGA_LAC_ATIVA` ainda não coberto)
+- [x] Detectar **vencimento** de licença — `classificarUrgenciaLicenca()`: `vencida` / `critica_30d` / `atencao_60d` / `atencao_90d` / `ok`, persistido em `car_licenses`
+- [x] `fetchAutorizacoes(polygon)` — `AUTORIZACAO_DESMATE_SEMA` + `AUTEX_PMFS_SEMA` (`AUTORIZACAO_EXPLORACAO_SEMA` ainda não coberta)
+- [x] `alertaTemAutorizacao(alertGeometry, autorizacoes)` — helper pronto para o **cruzamento com alertas** (ver 5.4), ainda não ligado ao fluxo de triagem
 
-### 4.3 Camadas do próprio CAR (ouro para o eng. florestal) ⭐
-- [ ] `fetchCarLayers(carNumber)` — todas as camadas do imóvel: `CAR_ATP`, `CAR_ARL`, `CAR_APP`, `CAR_APPD`, `CAR_AUAS`, `CAR_AVN`, `CAR_AU`, `CAR_NASCENTE`, `SIMCAR_CAR_AREA_CONSOLIDADA`
-- [ ] Calcular **déficit/excedente de Reserva Legal** (ARL exigida por bioma vs ARL declarada)
-- [ ] Calcular **passivo em APP** (uso consolidado sobreposto a APP)
-- [ ] Área antropizada pós-2008 (`ABERTURA` da AUAS) — indicativo de irregularidade
+### 4.3 Camadas do próprio CAR (ouro para o eng. florestal) ⭐ — parcial
+- [x] `fetchAllCarLayers(carNumberWfs)` — `CAR_ARL`, `CAR_APP`, `CAR_APPD`, `CAR_APPRL`, `CAR_AVN`, `CAR_AUAS`, `CAR_AU`, `CAR_NASCENTE`, `SIMCAR_CAR_AREA_CONSOLIDADA` (filtro por atributo `NUMERO_CAR`, não espacial — mais rápido e exato; `CAR_ATP` já coberto por `fetchCarPolygon`)
+- [x] Calcular **déficit de Reserva Legal** — `detectBioma()` (interseção com `Geoportal:BIOMAS_MT`) + `calcularConformidade()` (Art. 12, Lei 12.651/2012; MT 100% Amazônia Legal) — validado ao vivo (CAR real: bioma Amazônia, 80% exigido, sem déficit)
+- [ ] Calcular **passivo em APP** (uso consolidado sobreposto a APP) — precisa geração de buffer/geometria, fica para a Fase 13 (ProcessarGeo)
+- [x] Rastreio do ano de abertura mais recente (`ABERTURA` da AUAS) — indicador de antropização; classificação "pós-2008" ainda não aplicada como alerta específico
 
-### 4.4 Sobreposições fundiárias
-- [ ] `fetchSobreposicoes(polygon)` — `TERRAS_INDIGENAS`, `UNIDADES_CONSERVACAO`, `ASSENTAMENTOS_INCRA`, `ASSENTAMENTOS_INTERMAT`, `CORREDORES_BIODIVERSIDADE`
-- [ ] Alertar % de sobreposição e nome da área restrita
+### 4.4 Sobreposições fundiárias ✅
+- [x] `fetchSobreposicoes(polygon)` — `TERRAS_INDIGENAS`, `UNIDADES_CONSERVACAO`, `ASSENTAMENTOS_INCRA`, `ASSENTAMENTOS_INTERMAT`, `CORREDORES_BIODIVERSIDADE`
+- [x] Alerta quando surge **nova** sobreposição (% e nome), com histórico em `car_sobreposicoes`
 
 ### 4.5 Novas integrações (INPE) 🆕
 - [ ] **PRODES INPE** — desmatamento oficial anual: WFS `terrabrasilis.dpi.inpe.br/geoserver/ows`, camada `prodes-legal-amz:yearly_deforestation` (endpoint já usado pelo GeoForest)
@@ -140,9 +141,9 @@ Objetivo: transformar o AlertaCAR de "monitor de desmate" em **monitor ambiental
 - [ ] `fetchDesmateVizinho(polygon, bufferKm)` — desmatamento em imóveis **lindeiros** (risco de avanço/invasão)
 - [ ] Mudança cadastral no próprio CAR (retificação, alteração de área) via re-fetch e diff
 
-### 4.7 Cron multicamada
-- [ ] Estender `monitor.ts`: para cada CAR, rodar todas as fontes acima (independentes, try/catch por fonte)
-- [ ] Registrar por fonte no `cron_logs` (quantos alertas por origem)
+### 4.7 Cron multicamada ✅
+- [x] Estendido `monitor.ts` (`runDailyMonitor`): SCCON + `monitorAllCarsMultilayer()` — cada fonte independente, try/catch por fonte, cada CAR isolado do resto
+- [x] Registrado em `cron_logs.sources_json` (contagem agregada SCCON vs SEMA multicamada); granularidade por sub-fonte (embargo/infração/licença/...) fica no retorno de `monitorCarMultilayer`, ainda não persistida individualmente no log do cron
 
 ---
 

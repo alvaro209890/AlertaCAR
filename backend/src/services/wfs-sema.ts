@@ -72,12 +72,12 @@ function calculateAreaHa(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon): numb
   // 1 grau ≈ 111,320m no equador
   const DEG_TO_M = 111320
   
-  const polygons: number[][][] = geometry.type === 'Polygon'
+  const polygons: GeoJSON.Position[][][] = geometry.type === 'Polygon'
     ? [geometry.coordinates]
     : geometry.coordinates
-  
+
   let totalAreaM2 = 0
-  
+
   for (const poly of polygons) {
     const ring = poly[0] // outer ring
     let area = 0
