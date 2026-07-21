@@ -1,6 +1,7 @@
 import config from '../lib/config.js'
 import db from '../db/connection.js'
 import { v4 as uuid } from 'uuid'
+import { dispatchNewAlertWebhooks } from './webhooks.js'
 
 /* ─── Constantes SCCON ─── */
 const UA =
@@ -161,6 +162,7 @@ export async function searchAlertsByCar(
 
 export async function saveNewAlerts(
   carId: string,
+  carNumber: string,
   userId: string,
   alerts: ScconAlert[],
 ): Promise<{ saved: number; skipped: number; alerts: any[] }> {
@@ -188,8 +190,9 @@ export async function saveNewAlerts(
     const description = `${title} — ${alert.areaHa.toFixed(2)} ha em ${formatDate(alert.detectedDate)}`
 
     try {
+      const id = uuid()
       insert.run(
-        uuid(),
+        id,
         carId,
         userId,
         String(alert.id),
@@ -201,6 +204,16 @@ export async function saveNewAlerts(
         alert.geometry ? JSON.stringify(alert.geometry) : null,
       )
       saved++
+      dispatchNewAlertWebhooks(userId, {
+        id,
+        carId,
+        carNumber,
+        source: 'sccon',
+        classType: alert.classType,
+        title,
+        detectedDate: alert.detectedDate,
+        areaHa: alert.areaHa || 0,
+      })
     } catch (err: any) {
       // IGNORE constraint pode falhar, mas logamos
       if (!err.message?.includes('UNIQUE constraint')) {
@@ -242,7 +255,7 @@ export async function checkCar(carId: string): Promise<CheckResult> {
     const alerts = await searchAlertsByCar(carWfs)
     result.alertsFound = alerts.length
 
-    const { saved, skipped } = await saveNewAlerts(carId, car.user_id, alerts)
+    const { saved, skipped } = await saveNewAlerts(carId, car.car_number, car.user_id, alerts)
     result.alertsNew = saved
     result.alertsSkipped = skipped
 

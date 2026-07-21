@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@turf/turf": "^7.3.5",
+    "archiver": "^7.0.1",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.5",
@@ -18,9 +19,11 @@
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^3.0.3",
+    "pdfkit": "^0.19.1",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
+    "@types/archiver": "^6.0.4",
     "@types/bcrypt": "^5.0.2",
     "@types/better-sqlite3": "^7.6.11",
     "@types/cors": "^2.8.17",
@@ -29,6 +32,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.0.0",
     "@types/node-cron": "^3.0.11",
+    "@types/pdfkit": "^0.17.6",
     "@types/uuid": "^10.0.0",
     "esbuild": "^0.24.0",
     "tsx": "^4.19.0",

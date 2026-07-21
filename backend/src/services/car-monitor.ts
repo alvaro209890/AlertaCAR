@@ -1,5 +1,6 @@
 import { v4 as uuid } from 'uuid'
 import db from '../db/connection.js'
+import { dispatchNewAlertWebhooks } from './webhooks.js'
 import type { SupportedPolygonGeometry } from './wfs-intersection.js'
 import {
   fetchAllCarLayers,
@@ -48,6 +49,7 @@ export interface CarMonitorResult {
 /** Insere achados como alertas, ignorando duplicados por (car_id, source, source_id). */
 function saveFindingsAsAlerts(
   carId: string,
+  carNumber: string,
   userId: string,
   source: SemaAlertSource,
   findings: SemaFinding[],
@@ -70,8 +72,10 @@ function saveFindingsAsAlerts(
       skipped++
       continue
     }
+    const id = uuid()
+    const detectedDate = finding.detectedDate || new Date().toISOString().split('T')[0]
     insert.run(
-      uuid(),
+      id,
       carId,
       userId,
       source,
@@ -79,17 +83,28 @@ function saveFindingsAsAlerts(
       finding.classType,
       finding.title,
       finding.description || null,
-      finding.detectedDate || new Date().toISOString().split('T')[0],
+      detectedDate,
       finding.areaHa || 0,
       finding.geometry ? JSON.stringify(finding.geometry) : null,
     )
     saved++
+    dispatchNewAlertWebhooks(userId, {
+      id,
+      carId,
+      carNumber,
+      source,
+      classType: finding.classType,
+      title: finding.title,
+      detectedDate,
+      areaHa: finding.areaHa || 0,
+    })
   }
   return { saved, skipped }
 }
 
 function saveSobreposicoesAsAlertsIfNew(
   carId: string,
+  carNumber: string,
   userId: string,
   sobreposicoes: Array<{ tipo: string; nome: string; intersectionHa: number; coveragePercentOfPolygon: number }>,
 ): number {
@@ -110,17 +125,29 @@ function saveSobreposicoesAsAlertsIfNew(
     const key = `${s.tipo}::${s.nome}`
     if (existing.has(key)) continue
     newCount++
+    const id = uuid()
+    const title = `Sobreposição — ${s.nome}`
     insertAlert.run(
-      uuid(),
+      id,
       carId,
       userId,
       `${s.tipo}::${s.nome}`,
       s.tipo,
-      `Sobreposição — ${s.nome}`,
+      title,
       `${s.coveragePercentOfPolygon.toFixed(2)}% do imóvel (${s.intersectionHa.toFixed(2)} ha) sobreposto a ${s.nome}`,
       today,
       s.intersectionHa,
     )
+    dispatchNewAlertWebhooks(userId, {
+      id,
+      carId,
+      carNumber,
+      source: 'fundiario',
+      classType: s.tipo,
+      title,
+      detectedDate: today,
+      areaHa: s.intersectionHa,
+    })
   }
 
   const upsert = db.prepare(`
@@ -259,7 +286,7 @@ export async function monitorCarMultilayer(carId: string): Promise<CarMonitorRes
   for (const [source, run] of runs) {
     try {
       const findings = await run()
-      const { saved } = saveFindingsAsAlerts(carId, car.user_id, source, findings)
+      const { saved } = saveFindingsAsAlerts(carId, car.car_number, car.user_id, source, findings)
       result.sources.push({ source, found: findings.length, saved })
       result.totalNewAlerts += saved
     } catch (err: any) {
@@ -269,7 +296,7 @@ export async function monitorCarMultilayer(carId: string): Promise<CarMonitorRes
 
   try {
     const sobreposicoes = await fetchSobreposicoes(polygon)
-    const newCount = saveSobreposicoesAsAlertsIfNew(carId, car.user_id, sobreposicoes)
+    const newCount = saveSobreposicoesAsAlertsIfNew(carId, car.car_number, car.user_id, sobreposicoes)
     result.sources.push({ source: 'fundiario', found: sobreposicoes.length, saved: newCount })
     result.totalNewAlerts += newCount
   } catch (err: any) {
@@ -280,7 +307,7 @@ export async function monitorCarMultilayer(carId: string): Promise<CarMonitorRes
     const licencas = await fetchLicenciamento(polygon)
     saveLicencas(carId, licencas)
     const toAlert = licencasParaAlertar(licencas)
-    const { saved } = saveFindingsAsAlerts(carId, car.user_id, 'sema_licenca', toAlert)
+    const { saved } = saveFindingsAsAlerts(carId, car.car_number, car.user_id, 'sema_licenca', toAlert)
     result.sources.push({ source: 'sema_licenca', found: licencas.length, saved })
     result.totalNewAlerts += saved
   } catch (err: any) {

@@ -213,6 +213,72 @@ export function initializeSchema() {
       PRIMARY KEY (car_id, tag_id)
     );
 
+    -- Fase 9.3: API Key por usuário (acesso programático — QGIS/ArcGIS/scripts) e Webhooks.
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      key_hash TEXT NOT NULL UNIQUE,
+      key_prefix TEXT NOT NULL,
+      label TEXT NOT NULL,
+      last_used_at TEXT,
+      revoked_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      url TEXT NOT NULL,
+      secret TEXT NOT NULL,
+      events_json TEXT NOT NULL DEFAULT '["alert.created"]',
+      active INTEGER DEFAULT 1,
+      last_status INTEGER,
+      last_triggered_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Fase 9.1: link temporário de compartilhamento de relatórios (expira em 24-72h).
+    CREATE TABLE IF NOT EXISTS report_shares (
+      id TEXT PRIMARY KEY,
+      token TEXT NOT NULL UNIQUE,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      report_type TEXT NOT NULL CHECK(report_type IN ('laudo', 'portfolio', 'historico')),
+      car_id TEXT REFERENCES cars(id),
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Fase 9.1: agendamento de geração de relatórios (entrega por Email/WhatsApp é da Fase 10).
+    CREATE TABLE IF NOT EXISTS report_schedules (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      scope TEXT NOT NULL CHECK(scope IN ('portfolio', 'car')),
+      car_id TEXT REFERENCES cars(id),
+      frequency TEXT NOT NULL CHECK(frequency IN ('weekly', 'monthly')),
+      active INTEGER DEFAULT 1,
+      last_run_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Relatórios gerados por agendamento, prontos para download (sem envio automático ainda).
+    CREATE TABLE IF NOT EXISTS report_files (
+      id TEXT PRIMARY KEY,
+      schedule_id TEXT NOT NULL REFERENCES report_schedules(id),
+      user_id TEXT NOT NULL REFERENCES users(id),
+      report_type TEXT NOT NULL,
+      car_id TEXT REFERENCES cars(id),
+      share_token TEXT,
+      generated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_report_shares_token ON report_shares(token);
+    CREATE INDEX IF NOT EXISTS idx_report_schedules_user ON report_schedules(user_id, active);
+    CREATE INDEX IF NOT EXISTS idx_report_files_schedule ON report_files(schedule_id, generated_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+    CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
+    CREATE INDEX IF NOT EXISTS idx_webhooks_user ON webhooks(user_id, active);
+
     CREATE INDEX IF NOT EXISTS idx_cars_user ON cars(user_id, active);
     CREATE INDEX IF NOT EXISTS idx_alerts_car ON alerts(car_id, detected_date);
     CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id, created_at);
@@ -241,6 +307,10 @@ export function initializeSchema() {
   // Fase 5: workflow profissional de alertas (status/notas)
   addColumnIfMissing('alerts', 'status', "TEXT DEFAULT 'novo'")
   addColumnIfMissing('alerts', 'notes', 'TEXT')
+
+  // Fase 9.1: marca própria do consultor nos relatórios PDF (logo/rodapé)
+  addColumnIfMissing('users', 'report_logo_base64', 'TEXT')
+  addColumnIfMissing('users', 'report_footer_text', 'TEXT')
 }
 
 /** ALTER TABLE ADD COLUMN idempotente (SQLite não suporta "IF NOT EXISTS" em colunas). */

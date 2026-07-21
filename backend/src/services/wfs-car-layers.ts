@@ -69,7 +69,7 @@ function extractAreaHa(properties: Record<string, any>): number {
 }
 
 /** Busca as feições de uma camada do CAR filtrando por NUMERO_CAR (com fallback sem SITUACAO). */
-async function fetchCarLayerFeatures(layerName: string, carNumberWfs: string): Promise<any[]> {
+export async function fetchCarLayerFeatures(layerName: string, carNumberWfs: string): Promise<any[]> {
   const escaped = carNumberWfs.replace(/'/g, "''")
   // ⚠️ O WFS da SEMA derruba a conexão com "AND" sem parênteses ao redor de
   // cada condição (confirmado ao vivo em 21/07/2026) — sempre usar (a)AND(b).

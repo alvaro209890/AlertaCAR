@@ -13,7 +13,12 @@ import alertsRoutes from './routes/alerts.js'
 import satelliteRoutes from './routes/satellite.js'
 import aiRoutes from './routes/ai.js'
 import portfolioRoutes from './routes/portfolio.js'
+import exportRoutes from './routes/export.js'
+import interopRoutes from './routes/interop.js'
+import reportsRoutes from './routes/reports.js'
+import publicReportsRoutes from './routes/public-reports.js'
 import { startCronMonitor } from './cron/monitor.js'
+import { startReportSchedulesCron } from './cron/reports.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -33,6 +38,11 @@ app.get('/api/health', (_req, res) => {
 })
 
 // API Routes
+// ⚠️ /api/public precisa vir ANTES de qualquer router montado no prefixo bare '/api'
+// (alerts/satellite/ai/export/interop/reports) — esses aplicam requireAuth sem filtro de
+// path e responderiam 401 antes da rota pública ser alcançada, já que Express tenta os
+// mounts na ordem de registro, não por especificidade.
+app.use('/api/public', publicReportsRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/cars', carsRoutes)
@@ -42,6 +52,9 @@ app.use('/api', alertsRoutes)
 app.use('/api', satelliteRoutes)
 app.use('/api', aiRoutes)
 app.use('/api/portfolio', portfolioRoutes)
+app.use('/api', exportRoutes)
+app.use('/api', interopRoutes)
+app.use('/api', reportsRoutes)
 
 // Servir frontends em produção
 if (config.nodeEnv === 'production') {
@@ -66,6 +79,7 @@ app.listen(config.port, () => {
   // Iniciar cron de monitoramento (só em produção ou se EXPLICITAMENTE ativado)
   if (config.nodeEnv === 'production' || process.env.ENABLE_CRON === 'true') {
     startCronMonitor()
+    startReportSchedulesCron()
   } else {
     console.log('[cron] Monitoramento NÃO iniciado (dev mode). Use ENABLE_CRON=true para ativar.')
   }

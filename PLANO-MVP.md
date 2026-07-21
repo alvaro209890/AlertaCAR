@@ -12,7 +12,7 @@ O que está **de fato implementado em código** (não só documentado):
 
 | Camada | Implementado | Ainda não existe |
 |--------|--------------|------------------|
-| **Backend** | Auth local, CRUD de CARs (+ apelido), SCCON, cron diário (SCCON + Fase 4), `/api/admin/stats`. **Fase 4**: motor WFS de interseção, camadas do CAR + conformidade de ARL, embargos/desembargos/infrações/notificações/autorizações/licenciamento (urgência)/sobreposições fundiárias. **Fase 5**: severidade calculada (`lib/severity.ts`), workflow de status/notas por alerta (`PATCH /api/alerts/:id`), listagem paginada+filtrada (`GET /api/cars/:id/alerts`). **Fase 6**: catálogo real de satélites, `frame` (URL de GetMap recortado), NDVI real amostrado via `GetFeatureInfo` (com cache) e tendência multi-ano — 74 testes no total, tudo validado ao vivo | Downloads, WhatsApp/Baileys, fila de notificação, IA, GIF/MP4 de timelapse |
+| **Backend** | Auth local, CRUD de CARs (+ apelido), SCCON, cron diário (SCCON + Fase 4), `/api/admin/stats`. **Fase 4**: motor WFS de interseção, camadas do CAR + conformidade de ARL, embargos/desembargos/infrações/notificações/autorizações/licenciamento (urgência)/sobreposições fundiárias. **Fase 5**: severidade calculada (`lib/severity.ts`), workflow de status/notas por alerta (`PATCH /api/alerts/:id`), listagem paginada+filtrada (`GET /api/cars/:id/alerts`). **Fase 6**: catálogo real de satélites, `frame` (URL de GetMap recortado), NDVI real amostrado via `GetFeatureInfo` (com cache) e tendência multi-ano. **Fase 7** (IA DeepSeek): chat/threads, score de risco, triagem, RAG jurídico, minuta de laudo. **Fase 8.1** (organização): clientes/tags/cores. **Fase 9** (21/07, backend completo): laudo/carteira/histórico em PDF (PDFKit), exports GIS (SHP/GeoJSON/KML/KMZ/CSV/GPKG), API Key, GeoJSON ao vivo p/ QGIS, Webhooks HMAC — 101 testes no total, tudo validado ao vivo (incl. GDAL/ogrinfo) | Importação em massa, tabela/mapa consolidado da carteira, ações em massa (Fase 8), WhatsApp/Baileys, fila de notificação (Fase 10), ferramentas GIS de conformidade (Fase 13) |
 | **App cliente** | Login, Cadastro, Dashboard (carteira simples, link p/ detalhe). **Fase 5**: página `/dashboard/cars/:id` real com 5 abas (Visão Geral, Alertas, Mapa, Camadas, Config) — reestruturado em `lib/`/`components/`/`pages/`, mapa Leaflet com camadas SEMA ao vivo, workflow de triagem de alertas, apelido. **Fase 6**: 6ª aba **Satélite** — timelapse por slider+play, split-view, gráfico de tendência NDVI (Recharts) | IA, documentos, exports, PWA, carteira avançada |
 | **Admin** | Placeholder mínimo (154 linhas) | Todo o painel |
 
@@ -53,7 +53,7 @@ workflow de triagem de alertas, e IA que resume, pontua risco e minuta pareceres
 | **6** | **Satélite / NDVI / Timelapse** | 20 itens | 3 |
 | **7** | **IA robusta (DeepSeek V4 Flash)** | 24 itens | 3-4 |
 | **8** | **Gestão de Carteira (consultor)** | 18 itens | 2-3 |
-| **9** | **Relatórios + Exportações + Interoperabilidade GIS** | 22 itens | 3 |
+| **9** | **Relatórios + Exportações + Interoperabilidade GIS** | ✅ backend pronto (21/07) | 3 |
 | **10** | **Notificações multicanal + WhatsApp** | 18 itens | 2-3 |
 | **11** | **Plataforma / UX / Modo Campo (mobile)** | 20 itens | 2-3 |
 | **12** | **Admin avançado + Segurança + Deploy + Backup** | 20 itens | 2 |
@@ -317,28 +317,58 @@ O consultor não tem 1 imóvel: tem uma **carteira**. Toda a navegação assume 
 
 ---
 
-## Fase 9 — Relatórios + Exportações + Interoperabilidade GIS 📄📥
+## Fase 9 — Relatórios + Exportações + Interoperabilidade GIS 📄📥 ✅ backend pronto (21/07/2026)
 
-### 9.1 Laudos e relatórios PDF
-- [ ] **Laudo técnico por imóvel**: capa, dados cadastrais, mapa, camadas do CAR, timeline de alertas, NDVI, análise IA, recomendações, espaço para ART/assinatura do RT
-- [ ] **Relatório de carteira consolidado** (todos os imóveis de um cliente/tag)
-- [ ] **Relatório histórico** (análise temporal por ano)
-- [ ] Geração via template HTML → Puppeteer/Playwright → PDF
-- [ ] **Templates com marca própria** (logo/rodapé do consultor — faz sentido mesmo sem white-label pago)
-- [ ] **Agendamento** (semanal/mensal) por email/WhatsApp
-- [ ] **Link temporário** de compartilhamento (expira em 24-72h) para enviar ao cliente final
+> **Desvio do plano original:** a Fase 9.1 previa "template HTML → Puppeteer/Playwright → PDF".
+> Implementado com **PDFKit** (mesma lib do laudo/relatório de importação do GeoForest) em vez
+> disso — gera o PDF por desenho vetorial direto (sem headless Chromium, sem HTML intermediário),
+> mais leve pra rodar no servidor e sem dependência de binário externo. O esboço do perímetro do
+> imóvel na capa do laudo também é vetorial (polígono real normalizado à página + pontos de
+> alerta coloridos por severidade) — não é um mapa georreferenciado com tiles; o mapa interativo
+> completo continua sendo a aba **Mapa** (Fase 5.2).
 
-### 9.2 Exportações GIS ⭐
-> Reusar `GeoForest/backend/shapefile-writer.ts` (escreve `.shp`/`.shx`/`.dbf`/`.prj`, corrige orientação ESRI, trata MultiPolygon/pontos) — sem lib externa.
-- [ ] Polígono do CAR e alertas em **SHP (.zip), GeoJSON, KML, KMZ, CSV, GPKG**
-- [ ] Exportar **todas as camadas do CAR** (ATP/ARL/APP/…) num pacote
-- [ ] `GET /api/cars/:id/export?format=...` e `/alerts/export?format=...`
-- [ ] Exportação em massa da carteira (Fase 8)
+### 9.1 Laudos e relatórios PDF ✅
+- [x] **Laudo técnico por imóvel**: capa, dados cadastrais, conformidade de ARL, esboço vetorial do
+  perímetro + alertas, camadas do CAR, licenciamento, sobreposições, score de risco, timeline de
+  alertas, análise/recomendações da IA (Markdown → PDF), disclaimer e espaço para assinatura do RT
+  — `services/pdf-report.ts` (`buildLaudoPdf`), `GET /api/cars/:id/report/laudo.pdf`
+- [x] **Relatório de carteira consolidado** (todos os imóveis do usuário, com filtro opcional por
+  `clientId`/`tagId`): resumo + ranking de risco — `buildPortfolioReportPdf`, `GET /api/portfolio/report.pdf`
+- [x] **Relatório histórico** (NDVI por ano do cache `car_ndvi` + alertas agrupados por ano) —
+  `buildHistoricoPdf`, `GET /api/cars/:id/report/historico.pdf`
+- [x] **Templates com marca própria**: logo (base64) e rodapé por usuário — `PATCH/GET /api/users/me/branding`
+- [x] **Link temporário de compartilhamento** (24–72h, token aleatório, sem auth) —
+  `POST /api/cars/:id/report/laudo/share`, `GET /api/public/reports/:token`
+- [x] **Agendamento** (semanal/mensal, por carteira ou por imóvel) — `POST/GET/DELETE /api/report-schedules`,
+  cron diário `cron/reports.ts` gera o link de compartilhamento automaticamente quando o agendamento
+  vence — [ ] **entrega automática por Email/WhatsApp fica pendente da Fase 10** (por ora o link fica
+  disponível em `GET /api/report-schedules/files` pro usuário baixar)
+- [ ] Editor de blocos (introdução/análise/conclusão com mapas embutidos) no front — o laudo Markdown
+  da Fase 7.4 já é renderizado automaticamente na seção "Análise e recomendações (IA)" do PDF, mas
+  não há tela dedicada de edição de blocos
+- [ ] Botões/telas no app para disparar os downloads acima (ficou só a API por ora)
 
-### 9.3 Interoperabilidade
-- [ ] **API Key** por usuário para acesso programático (QGIS/ArcGIS/scripts)
-- [ ] Endpoint **WMS/WFS** próprio (ou link "abrir no QGIS") dos polígonos e alertas
-- [ ] **Webhooks** — dispara POST quando surge novo alerta (integra com outros sistemas do consultor)
+### 9.2 Exportações GIS ⭐ ✅
+> Portado `GeoForest/backend/shapefile-writer.ts` sem alterações de lógica (`backend/src/services/shapefile-writer.ts`).
+- [x] Polígono do CAR e alertas em **SHP (.zip), GeoJSON, KML, KMZ, CSV, GPKG** — `services/gis-export.ts`
+  (GPKG escrito à mão sobre `better-sqlite3.serialize()` + WKB, sem lib externa; todos os formatos
+  validados com `ogrinfo`/GDAL real, não só round-trip próprio)
+- [x] Exportar **todas as camadas do CAR** (ATP/ARL/APP/…) num pacote — `target=layers|all` (zip
+  multi-arquivo p/ SHP/GeoJSON/CSV, multi-tabela/multi-folder p/ GPKG/KML)
+- [x] `GET /api/cars/:id/export?format=&target=` e `GET /api/cars/:id/alerts/export?format=`
+- [ ] Exportação em massa da carteira — depende das ações em massa da Fase 8.3 (endpoint de export
+  já é reaproveitável por múltiplos CARs, falta só o disparo em lote na Fase 8)
+
+### 9.3 Interoperabilidade ✅
+- [x] **API Key** por usuário (`alertacar_live_…`, hash SHA-256, `Bearer <key>` ou header `X-Api-Key`,
+  até 10 por usuário) — `services/api-keys.ts`, `POST/GET/DELETE /api/interop/api-keys`
+- [x] Endpoint **GeoJSON ao vivo** dos polígonos e alertas p/ abrir no QGIS/ArcGIS via "Add Vector
+  Layer from URL" — `GET /api/gis/cars.geojson`, `GET /api/gis/alerts.geojson` (WFS/WMS *padrão OGC*
+  completo com `GetCapabilities` XML não foi implementado — GeoJSON direto cobre o caso de uso real
+  de "abrir no QGIS" com bem menos esforço)
+- [x] **Webhooks** — HMAC-SHA256 (`X-AlertaCAR-Signature: sha256=…`), dispara `alert.created` nos
+  3 pontos onde alertas novos são salvos (SCCON, SEMA multicamada, sobreposições fundiárias), fire-and-forget
+  — `services/webhooks.ts`, `POST/GET/PATCH/DELETE /api/interop/webhooks`
 
 ---
 
