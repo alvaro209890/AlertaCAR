@@ -4,7 +4,7 @@
 
 - React 19 + Vite + TypeScript
 - Tailwind CSS + shadcn/ui (mesmo padrão GeoForest)
-- Firebase Auth (cliente)
+- Auth local: email/senha → JWT no localStorage
 - Wouter (roteamento leve)
 - Leaflet + react-leaflet (mapa)
 - Sonner (toast notifications)

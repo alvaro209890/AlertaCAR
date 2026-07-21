@@ -4,7 +4,7 @@
 
 - React 19 + Vite + TypeScript
 - Tailwind CSS + shadcn/ui
-- Firebase Auth (cliente)
+- Auth local (JWT, mesmo backend)
 - Wouter (roteamento)
 
 ## Design

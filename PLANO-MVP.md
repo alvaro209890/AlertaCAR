@@ -1,241 +1,166 @@
 # Plano MVP — AlertaCAR
 
-> ✅ Integrações testadas (SCCON + WFS SEMA). Apenas código da aplicação pendente.
+> ✅ Testes de integração concluídos. 135 camadas WFS mapeadas. SCCON via API paginada funcional.
 
 ## Resumo
 
-| Fase | Dias | Entregável |
-|------|------|-----------|
-| 1 - Fundação | 1-2 | Auth + monorepo + backend base |
-| 2 - CRUD CARs | 1 | WFS SEMA funcional + dashboard de CARs |
-| 3 - SCCON | 1-2 | Cron diário + timeline de alertas |
-| 4 - WhatsApp | 1 | Baileys + notificações |
-| 5 - Admin + Mapas | 1 | Painel admin + mapa Leaflet |
-| 6 - Deploy | 1 | Túnel + systemd + produção |
+| Fase | Descrição | Checklist | Dias |
+|------|-----------|-----------|------|
+| 1 | Fundação — monorepo, auth local, backend base | 15 itens | 1-2 |
+| 2 | CRUD CARs — WFS SEMA, busca polígono, dashboard | 12 itens | 1 |
+| 3 | SCCON — alertas desmatamento, cron diário | 10 itens | 1 |
+| 4 | SEMA — embargos, infrações, licenciamento | 8 itens | 1 |
+| 5 | WhatsApp + Admin + Mapas + UI | 14 itens | 1-2 |
+| 6 | Deploy — systemd, túnel, produção | 10 itens | 1 |
 
-**Total: 5-6 dias para MVP funcional.**
-
----
-
-## Fase 1 — Fundação (Dia 1-2)
-
-### 1.1 Setup do projeto
-- [ ] Inicializar monorepo com pastas `app/`, `admin/`, `backend/`
-- [ ] `app/`: Vite + React 19 + TypeScript + Tailwind + shadcn/ui
-- [ ] `admin/`: Vite + React 19 + TypeScript + Tailwind + shadcn/ui
-- [ ] `backend/`: Express + TypeScript + esbuild (padrão GeoForest)
-- [ ] ESLint + Prettier configurado
-- [ ] `.env.example` completo (ver checklist de variáveis)
-- [ ] `.gitignore`: `node_modules/`, `dist/`, `data/`, `.env`
-
-### 1.2 Firebase
-- [ ] Projeto Firebase existente ou novo
-- [ ] Firebase Auth habilitado (email/senha)
-- [ ] Firebase Admin SDK JSON no lugar
-- [ ] `VITE_FIREBASE_*` configuradas no `.env`
-
-### 1.3 Backend base
-- [ ] Express na porta 3002
-- [ ] Middleware CORS
-- [ ] Middleware de auth (verificar token Firebase no header `Authorization`)
-- [ ] SQLite setup com `better-sqlite3`
-- [ ] Schema inicial: `users`, `cars`, `alerts`, `whatsapp_sessions`
-- [ ] Endpoint `GET /api/health`
-- [ ] Testar com curl
-
-### 1.4 Frontend App — Auth
-- [ ] Firebase Auth UI: login + cadastro
-- [ ] Cadastro exige: nome, email, senha, **número WhatsApp** (+55 obrigatório)
-- [ ] Contexto `AuthContext` com `user`, `loading`, `logout`
-- [ ] Rota protegida: redireciona para `/login` se não autenticado
-- [ ] Dashboard vazio com header "Bem-vindo, {nome}"
-- [ ] Botão "Adicionar CAR" desabilitado (placeholder)
-
-### 1.5 Frontend Admin — Auth
-- [ ] Login (mesmo Firebase Auth)
-- [ ] Verificação de admin no backend (whitelist de UIDs)
-- [ ] Redirect: se não admin → mensagem "Acesso restrito"
-- [ ] Dashboard admin vazio
-
-### Checklist de variáveis de ambiente
-```
-# App
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_API_URL=https://alertacar-api.cursar.space
-
-# Backend
-PORT=3002
-NODE_ENV=production
-FIREBASE_SERVICE_ACCOUNT_PATH=
-DATABASE_PATH=./data/alertacar.db
-SCCON_ORG_UUID=597953b9-ee78-4113-80f9-803dbbaa60a0
-SCCON_START_DATE=2019-07-22
-WFS_BASE_URL=https://geo.sema.mt.gov.br/geoserver/ows
-WFS_AUTHKEY=541085de-9a2e-454e-bdba-eb3d57a2f492
-ADMIN_UIDS=uid1,uid2
-```
+**Total: 5-7 dias para MVP com monitoramento multicamada.**
 
 ---
 
-## Fase 2 — CRUD de CARs (Dia 2-3)
+## Fase 1 — Fundação
 
-### 2.1 Backend — WFS SEMA
-- [ ] Serviço `wfs-sema.ts`: buscar polígono por nº CAR
-- [ ] Função `fetchCarByNumber(carNumber)`: tenta formatos `MTXXXXX/YYYY`
-- [ ] Cache SQLite: 30 dias, não invalida em falha
-- [ ] Retry 3x com backoff (timeout 30s)
-- [ ] Converter EPSG:4674 → EPSG:4326 via proj4js
-- [ ] Testar com CAR de teste: `MT27827/2017`
+### 1.1 Setup
+- [ ] `mkdir -p Banco_de_dados/AlertaCAR/` (fora do repo!)
+- [ ] Monorepo: `app/`, `admin/`, `backend/`
+- [ ] Vite + React 19 + TS + Tailwind + shadcn/ui (app + admin)
+- [ ] Express + TS + esbuild (backend)
+- [ ] ESLint + Prettier
+- [ ] `.env.example` completo
 
-### 2.2 Backend — Rotas
-- [ ] `POST /api/cars` — body `{carNumber}`, busca polígono, salva
-- [ ] `GET /api/cars` — lista CARs do usuário (com último alerta)
-- [ ] `GET /api/cars/:id` — detalhes + polígono GeoJSON + área
-- [ ] `DELETE /api/cars/:id` — soft delete (active=0)
-- [ ] `POST /api/cars/:id/check` — força consulta agora
+### 1.2 Auth Local
+- [ ] Tabela `users`: email, password_hash (bcrypt), name, whatsapp_number
+- [ ] `POST /api/auth/register` — validar email único, bcrypt 12 rounds, retornar JWT
+- [ ] `POST /api/auth/login` — verificar senha, retornar JWT
+- [ ] `GET /api/auth/me` — dados do usuário logado
+- [ ] Middleware `requireAuth` — verificar JWT no header
+- [ ] `JWT_SECRET` gerado e salvo no `.env`
 
-### 2.3 Frontend App — Dashboard de CARs
-- [ ] Formulário "Adicionar CAR": input, validação, loading
-- [ ] Card de cada CAR com:
-  - Nº CAR em destaque
-  - Status (ativo ✓)
-  - Área em hectares
-  - Município
-  - "Último check: há X horas"
-  - Badge com contagem de alertas não lidos
-- [ ] Empty state: ilustração + "Você ainda não monitora nenhum CAR"
-- [ ] Loading: skeleton cards com shimmer
-- [ ] Erro: toast com mensagem + retry
+### 1.3 Frontend Auth
+- [ ] Página de login (email + senha)
+- [ ] Página de cadastro (nome, email, senha, **WhatsApp obrigatório**)
+- [ ] `AuthContext` com token JWT no localStorage
+- [ ] Rota protegida, redirect se não autenticado
+- [ ] Dashboard vazio pós-login
 
 ---
 
-## Fase 3 — Integração SCCON (Dia 3-4)
+## Fase 2 — CRUD de CARs
 
-### 3.1 Backend — Serviço SCCON
-- [ ] `sccon.ts`: implementar `fetchScconAlerts(geometry)`
-- [ ] Função `getPublicToken()` — cache em memória (24h)
-- [ ] Função `getUserId(token)` — cache
-- [ ] Função `fetchWfsAlertIds(bbox, classes, token, userId)`
-- [ ] Função `fetchAlertDetails(ids, token)` — paralelo (12 workers)
-- [ ] Detectar alertas NOVOS: comparar `idt_local_alert` com DB
+### 2.1 WFS SEMA
+- [ ] `wfs-sema.ts`: `fetchCarPolygon(carNumber)`
+- [ ] Conversão de formato: nº simplificado → `MTXXXXX/YYYY`
+- [ ] Cache polígono: 30 dias, SQLite
+- [ ] Retry 3x com backoff
+- [ ] Reprojeção SIRGAS 2000 → WGS84
 
-### 3.2 Backend — Cron Diário
-- [ ] `node-cron` schedule: `0 6 * * *` (06:00 BRT)
-- [ ] Fluxo: buscar CARs ativos → para cada → polígono cache → WFS SCCON → detalhes → spatial join → salvar novos → enfileirar WhatsApp
-- [ ] Log de execução: timestamp, CARs processados, alertas encontrados, falhas
-- [ ] Endpoint `GET /api/admin/cron/status` para ver última execução
+### 2.2 Rotas
+- [ ] `POST /api/cars` — body `{carNumber}`, busca WFS, salva
+- [ ] `GET /api/cars` — lista CARs (com último alerta e contagem)
+- [ ] `GET /api/cars/:id` — detalhes + GeoJSON + área
+- [ ] `DELETE /api/cars/:id` — soft delete
 
-### 3.3 Frontend App — Timeline de Alertas
-- [ ] Página de detalhes do CAR com seção "Alertas"
-- [ ] Timeline vertical, ordenada por data (mais recente no topo)
-- [ ] Cada alerta mostra:
-  - Badge colorido: 🔴 Desmatamento / 🟠 Degradação / 🟡 Queimada
-  - Data formatada: "27/12/2019"
-  - Área: "12.5 ha"
-  - Status: "Enviado via WhatsApp ✅"
-- [ ] Loading state, empty state ("Nenhum alerta detectado — ótimo sinal! 🌿")
+### 2.3 Dashboard
+- [ ] Card de cada CAR: nº, município, área, status
+- [ ] Badge de alertas não lidos
+- [ ] Empty state com CTA
+- [ ] Formulário "Adicionar CAR" com loading e feedback
 
 ---
 
-## Fase 4 — WhatsApp (Dia 4-5)
+## Fase 3 — SCCON (Desmatamento)
 
-### 4.1 Backend — Baileys
-- [ ] `whatsapp.ts`: setup do baileys com auth state em SQLite
-- [ ] Geração de QR Code (base64 PNG)
-- [ ] Handler de conexão: `connection.update`
-- [ ] Reconexão automática em desconexão
-- [ ] Endpoints:
-  - `GET /api/admin/whatsapp/status` → `{connected: true/false}`
-  - `GET /api/admin/whatsapp/qr` → `{qr: "base64..."}` (admin only)
-  - `POST /api/admin/whatsapp/reconnect` → força reconexão
-  - `POST /api/admin/whatsapp/disconnect` → logout
+### 3.1 Serviço SCCON
+- [ ] `sccon.ts`: `getPublicToken()` — cache 23h
+- [ ] `searchAlertsByCar(carNumber)` — POST `/alerts/search` com `cdCars`
+- [ ] Filtrar alertas NOVOS (comparar `source_id` com DB)
+- [ ] Salvar em `alerts` com `source='sccon'`
 
-### 4.2 Backend — Fila de Notificações
-- [ ] `notification.ts`: fila em memória + persistência SQLite
-- [ ] Template de mensagem formatado
-- [ ] Rate limiting: 1 por CAR/hora, 10 por usuário/dia
-- [ ] Retry 3x em falha, com backoff
-- [ ] Registrar em `alerts` com `sent_to_whatsapp=1`
+### 3.2 Cron SCCON
+- [ ] `node-cron`: `0 6 * * *`
+- [ ] Para cada CAR ativo: SCCON search → filtrar novos → salvar → enfileirar WhatsApp
+- [ ] Log por CAR (sucesso, alertas, falhas)
 
-### 4.3 Frontend Admin — WhatsApp Connect
-- [ ] Página dedicada no admin
-- [ ] Estado desconectado: botão "Conectar WhatsApp" → mostra QR Code
-- [ ] QR Code com polling automático (3s)
-- [ ] Estado conectado: indicador verde ●, número, uptime
-- [ ] Botão "Desconectar" com confirmação
-- [ ] Instruções visuais (ícones) de como escanear
+### 3.3 Timeline de Alertas
+- [ ] Página detalhes do CAR com seção "Alertas SCCON"
+- [ ] Timeline vertical: badges coloridos por classe
+- [ ] Exibir: classe, data, área, status WhatsApp
 
 ---
 
-## Fase 5 — Admin + Mapas + UI Polida (Dia 5)
+## Fase 4 — SEMA Multicamada
 
-### 5.1 Painel Admin
-- [ ] Dashboard com cards: usuários, CARs ativos, alertas/24h, WhatsApp status
-- [ ] Tabela de usuários: nome, email, WhatsApp, CARs, status, ações
-- [ ] Log de notificações: data, usuário, CAR, tipo, status
-- [ ] Configurações: alterar horário do cron, templates de mensagem
+### 4.1 Embargos
+- [ ] `wfs-sema.ts`: `fetchEmbargos(polygon)` — camada `AREAS_EMBARGADAS_SEMA`
+- [ ] Detectar NOVOS embargos (BBOX intersect)
+- [ ] Salvar como `source='sema_embargo'`
 
-### 5.2 Mapa Interativo (App Usuário)
-- [ ] Leaflet + react-leaflet no detalhe do CAR
-- [ ] Tile layer: OpenStreetMap
-- [ ] Overlay: polígono do CAR (GeoJSON, borda emerald, fill transparente 20%)
-- [ ] Overlay: alertas SCCON (pontos/markers nos centróides, coloridos por classe)
-- [ ] Popup nos alertas: classe, data, área
-- [ ] Fit bounds ao carregar (zoom no polígono)
+### 4.2 Infrações
+- [ ] `fetchInfracoes(polygon)` — `TDAD_FISCALIZACAO_AUTO_DE_INFRACAO`
+- [ ] `fetchNotificacoes(polygon)` — `TDAD_FISCALIZACAO_NOTIFICACAO`
 
-### 5.3 UI/UX Polida
-- [ ] Tema: escuro por padrão (dark mode) com glassmorphism
-- [ ] Paleta: emerald/teal para elementos positivos, amber/red para alertas
-- [ ] Cards com `backdrop-blur` e borda sutil
-- [ ] Botões com gradiente e `active:scale-[0.97]`
-- [ ] Animações sutis: fadeIn nos cards, slideIn na timeline
-- [ ] Responsivo: mobile-first, sidebar colapsa em telas pequenas
-- [ ] Toast notifications (sonner): sucesso ao adicionar CAR, erro ao buscar
+### 4.3 Licenciamento
+- [ ] `fetchLicenciamento(polygon)` — `SIMLAMGEO_LP/LI/LO_ATIVA`
+- [ ] Alertar novas licenças ou vencimento próximo
+
+### 4.4 Fundiário (sobreposições)
+- [ ] `fetchSobreposicoes(polygon)` — UC, TI, Assentamentos INCRA
+- [ ] Alertar se polígono do CAR sobrepõe área restrita
 
 ---
 
-## Fase 6 — Deploy (Dia 5-6)
+## Fase 5 — WhatsApp + Admin + Mapas + UI
 
-### 6.1 Build de Produção
-- [ ] Build app: `cd app && pnpm run build` → `app/dist/`
-- [ ] Build admin: `cd admin && pnpm run build` → `admin/dist/`
-- [ ] Build backend: `esbuild src/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist`
+### 5.1 Baileys
+- [ ] Sessão persistente SQLite
+- [ ] QR Code (base64)
+- [ ] Reconexão automática
+- [ ] `sendAlert(to, carNumber, alerts)` com template
 
-### 6.2 Systemd
-- [ ] Criar `/home/server/.config/systemd/user/alertacar-backend.service`
-- [ ] `Restart=always`, `RestartSec=5`
-- [ ] `Environment=PORT=3002`
+### 5.2 Painel Admin
+- [ ] Dashboard: cards (usuários, CARs, alertas, WhatsApp)
+- [ ] WhatsApp Connect: QR Code com polling
+- [ ] Tabela de usuários
+- [ ] Log de notificações
+- [ ] Configurações (horário cron, template)
+
+### 5.3 Mapa
+- [ ] Leaflet no detalhe do CAR
+- [ ] Polígono do CAR (emerald, fill 15%)
+- [ ] Markers dos alertas SCCON (coloridos por classe)
+- [ ] Overlays: embargos (red), UC (green), TI (orange)
+
+### 5.4 UI/UX
+- [ ] Dark mode padrão, glassmorphism
+- [ ] Cards com `backdrop-blur`
+- [ ] Botões gradiente `active:scale-[0.97]`
+- [ ] Animações: fadeIn, slideIn
+- [ ] Responsivo mobile-first
+
+---
+
+## Fase 6 — Deploy
+
+### 6.1 Build
+- [ ] `app/`: `pnpm run build` → `dist/`
+- [ ] `admin/`: `pnpm run build` → `dist/`
+- [ ] `backend/`: esbuild → `dist/index.js`
+
+### 6.2 Banco
+- [ ] `mkdir -p "/media/server/HD Backup/Servidores_NAO_MEXA/Banco_de_dados/AlertaCAR/"`
+- [ ] Schema criado na primeira execução
+
+### 6.3 Systemd
+- [ ] `alertacar-backend.service` (Restart=always, porta 3002)
 - [ ] `EnvironmentFile=/home/server/.config/alertacar/backend.env`
-- [ ] `systemctl --user enable alertacar-backend.service`
-- [ ] `systemctl --user start alertacar-backend.service`
 
-### 6.3 Cloudflare Tunnel
-- [ ] Criar túnel ou adicionar rotas ao existente
-- [ ] `alertacar.cursar.space` → `localhost:3002`
-- [ ] `alertacar-admin.cursar.space` → `localhost:3002`
-- [ ] `alertacar-api.cursar.space` → `localhost:3002`
-- [ ] Verificar HTTPS + certificado
+### 6.4 Cloudflare
+- [ ] 3 domínios → `localhost:3002`
+- [ ] Verificar HTTPS
 
-### 6.4 Teste End-to-End
-- [ ] Cadastrar usuário (Firebase + WhatsApp)
-- [ ] Adicionar CAR (WFS SEMA funciona)
-- [ ] Dashboard mostra CAR
-- [ ] Cron roda e detecta alertas (ou simular)
-- [ ] WhatsApp conectado e envia mensagem
-- [ ] Admin mostra métricas corretas
-- [ ] Mapa carrega com polígono
-
----
-
-## 📊 KPIs do MVP
-
-| Métrica | Alvo MVP |
-|---------|----------|
-| Tempo de cadastro | < 30s |
-| Tempo busca WFS SEMA | < 15s |
-| Tempo consulta SCCON | < 5s por CAR |
-| Entrega WhatsApp | < 10s após detecção |
-| CARs simultâneos | 50+ |
-| Uptime | 99% |
+### 6.5 Smoke test
+- [ ] Cadastro + login → JWT
+- [ ] Adicionar CAR → WFS SEMA
+- [ ] Dashboard → cards
+- [ ] Cron → alertas SCCON
+- [ ] WhatsApp → mensagem enviada
+- [ ] Mapa → polígono + markers
