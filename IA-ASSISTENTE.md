@@ -116,7 +116,7 @@ sugere **verdadeiro / falso positivo / provável legal** com justificativa. O co
 ### 5. Gerador de laudo (`/ai/laudo`) ⭐⭐
 Do contexto completo → minuta estruturada em blocos: **Introdução · Identificação do imóvel · Análise
 dos alertas · Análise de NDVI/satélite · Conformidade (ARL/APP) · Conclusão · Recomendações**.
-Retorna markdown editável; o front permite ajustar e inserir mapas/NDVI antes de exportar em PDF.
+ Retorna Markdown editável e persistido como rascunho; blocos estruturados, mapas/NDVI e exportação PDF são a próxima etapa.
 
 ---
 

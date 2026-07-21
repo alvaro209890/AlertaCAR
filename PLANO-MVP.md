@@ -282,7 +282,7 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 
 ### 7.4 Gerador de laudo/parecer ⭐⭐
 - [x] `POST /api/cars/:id/ai/laudo` — minuta de laudo técnico em Markdown, salva como rascunho
-- [ ] Editor no front com blocos (introdução, análise, conclusão, recomendações) + inserir mapas/NDVI
+- [ ] Editor no front com blocos (introdução, análise, conclusão, recomendações) + inserir mapas/NDVI — editor Markdown com salvar rascunho já entregue; blocos e mídias pendentes
 - [ ] Exporta para o PDF da Fase 9
 
 ### 7.5 UX de IA no app

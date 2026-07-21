@@ -88,6 +88,28 @@ router.post('/cars/:carId/ai/laudo', async (req: AuthRequest, res) => {
   } catch (error) { handleError(res, error) }
 })
 
+// GET /api/cars/:id/ai/laudos — rascunhos do imóvel para reabertura no editor.
+router.get('/cars/:carId/ai/laudos', (req: AuthRequest, res) => {
+  const car = db.prepare('SELECT id FROM cars WHERE id = ? AND user_id = ? AND active = 1').get(req.params.carId, req.user!.id) as any
+  if (!car) return void res.status(404).json({ error: 'CAR não encontrado' })
+  const laudos = db.prepare(`SELECT id, content_md, status, created_at, updated_at FROM ai_laudos
+    WHERE car_id = ? AND user_id = ? ORDER BY updated_at DESC LIMIT 30`).all(req.params.carId, req.user!.id) as any[]
+  res.json({ laudos: laudos.map(formatLaudo) })
+})
+
+// PATCH /api/ai/laudos/:id — o modelo cria rascunhos; só o usuário decide o texto final.
+router.patch('/ai/laudos/:id', (req: AuthRequest, res) => {
+  const contentMd = typeof req.body?.contentMd === 'string' ? req.body.contentMd.trim() : ''
+  const status = req.body?.status
+  if (!contentMd || contentMd.length > 100_000) return void res.status(400).json({ error: 'Conteúdo do laudo deve ter entre 1 e 100000 caracteres' })
+  if (status !== undefined && status !== 'rascunho' && status !== 'final') return void res.status(400).json({ error: 'Status de laudo inválido' })
+  const laudo = db.prepare('SELECT id FROM ai_laudos WHERE id = ? AND user_id = ?').get(req.params.id, req.user!.id) as any
+  if (!laudo) return void res.status(404).json({ error: 'Laudo não encontrado' })
+  db.prepare(`UPDATE ai_laudos SET content_md = ?, status = COALESCE(?, status), updated_at = datetime('now') WHERE id = ?`).run(contentMd, status ?? null, laudo.id)
+  const updated = db.prepare('SELECT id, content_md, status, created_at, updated_at FROM ai_laudos WHERE id = ?').get(laudo.id) as any
+  res.json({ laudo: formatLaudo(updated) })
+})
+
 router.post('/ai/triage', async (req: AuthRequest, res) => {
   const alertId = String(req.body?.alertId || '')
   const alert = db.prepare('SELECT * FROM alerts WHERE id = ? AND user_id = ?').get(alertId, req.user!.id) as any
@@ -246,6 +268,10 @@ function withDisclaimer(content: string) {
 
 function formatRisk(row: any, cached: boolean) {
   return { score: row.score, band: row.band, components: JSON.parse(row.components_json), explanation: withDisclaimer(row.explanation), cached }
+}
+
+function formatLaudo(row: any) {
+  return { id: row.id, contentMd: row.content_md, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at }
 }
 
 function safeError(error: unknown) { return error instanceof Error ? error.message : 'erro desconhecido' }

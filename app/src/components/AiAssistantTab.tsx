@@ -16,6 +16,7 @@ export default function AiAssistantTab({ carId }: { carId: string }) {
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [risk, setRisk] = useState<Risk | null>(null)
   const [output, setOutput] = useState('')
+  const [laudoId, setLaudoId] = useState<string | null>(null)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [question, setQuestion] = useState('')
@@ -33,8 +34,20 @@ export default function AiAssistantTab({ carId }: { carId: string }) {
     const response = await apiFetch(`/cars/${carId}/ai/${action}`, { method: 'POST' })
     setLoadingAction(null)
     const text = response.summary || response.recommendations || response.laudo?.contentMd
-    if (text) setOutput(text)
+    if (text) {
+      setOutput(text)
+      setLaudoId(typeof response.laudo?.id === 'string' ? response.laudo.id : null)
+    }
     else toast.error(response.error || 'Não foi possível gerar a análise')
+  }
+
+  const saveLaudo = async () => {
+    if (!laudoId || !output.trim()) return
+    setLoadingAction('save-laudo')
+    const response = await apiFetch(`/ai/laudos/${laudoId}`, { method: 'PATCH', body: JSON.stringify({ contentMd: output }) })
+    setLoadingAction(null)
+    if (response.laudo) toast.success('Rascunho salvo')
+    else toast.error(response.error || 'Não foi possível salvar o laudo')
   }
 
   const sendQuestion = async (event: React.FormEvent) => {
@@ -91,7 +104,14 @@ export default function AiAssistantTab({ carId }: { carId: string }) {
               {loadingAction === 'laudo' ? 'Gerando...' : 'Minuta de laudo'}
             </button>
           </div>
-          {output && <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-white/5 bg-black/15 p-3 font-sans text-sm leading-6 text-slate-300">{output}</pre>}
+          {output && (laudoId ? (
+            <div className="mt-4 space-y-2">
+              <textarea className="input-field min-h-80 resize-y font-mono text-sm leading-6" value={output} onChange={(event) => setOutput(event.target.value)} disabled={loadingAction !== null} aria-label="Minuta de laudo editável" />
+              <div className="flex justify-end">
+                <button className="btn-primary px-3 py-2 text-sm" onClick={saveLaudo} disabled={loadingAction !== null || !output.trim()}>{loadingAction === 'save-laudo' ? 'Salvando...' : 'Salvar rascunho'}</button>
+              </div>
+            </div>
+          ) : <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-white/5 bg-black/15 p-3 font-sans text-sm leading-6 text-slate-300">{output}</pre>)}
         </section>
       </div>
 
