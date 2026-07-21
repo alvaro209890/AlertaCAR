@@ -26,6 +26,10 @@ const config = {
   },
   bcryptRounds: 12,
   jwtExpiresIn: '7d',
+  // Hostname do subdomínio do painel admin (Fase 12.3, deploy com 3 domínios via Cloudflare
+  // Tunnel: alertacar / alertacar-admin / alertacar-api). O admin também continua acessível via
+  // /admin no domínio principal (compatibilidade com o modo single-domain).
+  adminHostname: process.env.ADMIN_HOSTNAME || 'alertacar-admin.cursar.space',
 }
 
 export default config

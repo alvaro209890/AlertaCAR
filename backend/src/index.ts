@@ -60,9 +60,20 @@ app.use('/api/tools', toolsRoutes)
 
 // Servir frontends em produção
 if (config.nodeEnv === 'production') {
+  // Deploy com 3 domínios (Fase 12.3): alertacar-admin.cursar.space serve o painel na RAIZ,
+  // não em /admin — reescreve a URL internamente pra reaproveitar o mesmo static+fallback de
+  // baixo (que já serve o admin via prefixo /admin). Mantém /admin funcionando no domínio
+  // principal também (alertacar.cursar.space/admin).
+  app.use((req, _res, next) => {
+    if (req.hostname === config.adminHostname && !req.path.startsWith('/api') && !req.path.startsWith('/admin')) {
+      req.url = `/admin${req.url}`
+    }
+    next()
+  })
+
   app.use('/', express.static(path.join(__dirname, '../../app/dist')))
   app.use('/admin', express.static(path.join(__dirname, '../../admin/dist')))
-  
+
   // SPA fallback
   app.get('*', (req, res) => {
     if (req.path.startsWith('/admin')) {
