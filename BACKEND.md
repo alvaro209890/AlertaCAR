@@ -85,7 +85,22 @@ Ver `ARQUITETURA.md` para schema completo.
 | GET | `/api/cars/:id/export?format=geojson\|shp\|kml` | Baixar polígono do CAR |
 | GET | `/api/cars/:id/alerts/export?format=csv\|geojson\|json` | Baixar alertas |
 | GET | `/api/cars/:id/report?format=pdf\|html` | Relatório da propriedade |
-| GET | `/api/cars/:id/satellite?date=YYYY-MM-DD` | Imagem de satélite |
+
+### Satélite (autenticado) 🛰️ 🆕
+
+A SEMA disponibiliza **43 camadas WMS de satélite** via GeoServer:
+Landsat 5 (1984-2011), Landsat 7 (2002), Landsat 8 (2013-2018),
+Sentinel-2 RGB (2016-2025), Sentinel-2 NIR/NDVI (2016-2025),
+SPOT, RESOURCESAT.
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/api/cars/:id/satellite/capabilities` | Listar satélites e anos disponíveis |
+| GET | `/api/cars/:id/satellite/timelapse?sat=sentinel&from=2016&to=2025` | Gerar GIF animado do timelapse |
+| GET | `/api/cars/:id/satellite/compare?sat1=landsat8&year1=2017&sat2=sentinel&year2=2024` | Imagem split-view antes/depois |
+| GET | `/api/cars/:id/satellite/ndvi?year=2024` | Mapa NDVI + dados numéricos (CSV) |
+| GET | `/api/cars/:id/satellite/frame?sat=sentinel&year=2024&format=png\|geotiff` | Frame único |
+| GET | `/api/cars/:id/satellite/analysis?from=2023&to=2024` | Análise automática de mudança (diferença NDVI) |
 
 ### Alertas (autenticado)
 

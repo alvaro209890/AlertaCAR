@@ -334,37 +334,304 @@ Campos:
 - Botão "Zoom to CAR" / "Zoom to alerts"
 - Ferramenta de medição (distância e área)
 
-#### Aba 4: 🛰️ Comparação de Satélite
+#### Aba 4: 🛰️ Satélite (Linha do Tempo Visual) ⭐⭐
+
+**A aba mais poderosa do app.** A SEMA-MT disponibiliza via GeoServer WMS décadas de imagens de satélite:
+
+| Satélite | Período | Resolução | Bandas |
+|----------|---------|-----------|--------|
+| Landsat 5 | 1984-2011 (28 anos) | 30m | RGB + NIR |
+| Landsat 7 | 2002 | 30m | RGB + NIR |
+| Landsat 8 | 2013-2018 | 15-30m | RGB + NIR + PAN |
+| Sentinel-2 | 2016-2025 (10 anos) | 10m | RGB + NIR (índice NDVI) |
+| SPOT | Mosaico estadual | 5m | RGB |
+| RESOURCESAT | 2012 | 23m | RGB |
+
+**Total: 43 camadas WMS de satélite** disponíveis no GeoServer da SEMA.
+
+##### 🎞️ Modo Timelapse
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Antes e Depois — imagens Landsat/CBERS                       │
+│  🎞️ Timelapse — MT27827/2017                                 │
 │                                                              │
-│  Data do alerta: [21/07/2026 ▼]                              │
+│  Satélite: [Sentinel-2 ▼]  Período: [2016 ▼] a [2025 ▼]    │
 │                                                              │
-│  ┌─────────────────────┐  ┌─────────────────────┐           │
-│  │                     │  │                     │           │
-│  │   ANTES             │  │   DEPOIS             │           │
-│  │   15/06/2026        │  │   21/07/2026         │           │
-│  │                     │  │                     │           │
-│  │  🟩🟩🟩🟩🟩🟩🟩 │  │  🟩🟩🟫🟫🟫🟩🟩 │           │
-│  │  🟩🟩🟩🟩🟩🟩🟩 │  │  🟩🟫🟫🟫🟫🟫🟩 │           │
-│  │  🟩🟩🟩🟩🟩🟩🟩 │  │  🟩🟩🟫🟫🟫🟩🟩 │           │
-│  │                     │  │                     │           │
-│  └─────────────────────┘  └─────────────────────┘           │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │                                                          ││
+│  │              ░░░░  MAPA PRINCIPAL  ░░░░                  ││
+│  │                                                          ││
+│  │      Satélite atual: Sentinel-2 2024                     ││
+│  │      Resolução: 10m/pixel                                ││
+│  │                                                          ││
+│  │  ┌──────────────────────────────────┐                    ││
+│  │  │ Polígono CAR sobreposto          │                    ││
+│  │  │ (borda emerald, fill 15%)       │                    ││
+│  │  └──────────────────────────────────┘                    ││
+│  │                                                          ││
+│  └──────────────────────────────────────────────────────────┘│
 │                                                              │
-│  🔴 Área desmatada detectada: 12.5 ha                        │
+│  ⏮️ ◀️ ▶️ ⏭️   Ano: 2024                                     │
 │                                                              │
-│  [▶️ Animação fade antes/depois]                             │
-│  [📥 Baixar imagem antes] [📥 Baixar imagem depois]          │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │ Timeline de miniaturas (2016-2025)                       ││
+│  │ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐        ││
+│  │ │2016 │ │2017 │ │2018 │ │2019 │ │2020 │ │2021 │ ...     ││
+│  │ │ 🟩  │ │ 🟩  │ │🟩🟫 │ │🟩🟫 │ │🟫🟫 │ │🟫🟫 │        ││
+│  │ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘        ││
+│  └──────────────────────────────────────────────────────────┘│
+│                                                              │
+│  🎬 [▶️ Reproduzir animação (2 fps)]                         │
+│  📥 [Baixar GIF animado] [Baixar frame atual (PNG)]          │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Features do comparador:**
-- Slider vertical/horizontal para comparar antes vs depois
-- WMS da SEMA como fonte das imagens (via GeoServer)
-- Timelapse animado (opcional, se múltiplas datas disponíveis)
-- Download das imagens em PNG
+**Player de timelapse:**
+- Slider de anos: arrasta para esquerda/direita
+- Botões ⏮️ ◀️ ▶️ ⏭️ para navegar ano a ano
+- ▶️ Reproduzir: animação automática (1-5 fps configurável)
+- Miniaturas abaixo: preview de cada ano, clique para pular
+- **Indicador visual**: a miniatura muda de cor quando há desmatamento visível (verde→marrom)
+- Detecção automática: se o alerta SCCON tem data X, destaca os anos próximos
+
+##### 🔬 Modo Comparação (Split View)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  🔬 Comparar — Antes vs Depois                               │
+│                                                              │
+│  ┌──────────────────────┬──────────────────────────────────┐ │
+│  │   ANTES              │   DEPOIS                          │ │
+│  │   Satélite:          │   Satélite:                       │ │
+│  │   [Landsat 8 ▼]     │   [Sentinel-2 ▼]                 │ │
+│  │   Ano: [2017 ▼]     │   Ano: [2025 ▼]                  │ │
+│  │                      │                                   │ │
+│  │  ┌────────────────┐  │  ┌────────────────────────────┐  │ │
+│  │  │                │  │  │                            │  │ │
+│  │  │  🟩🟩🟩🟩🟩🟩 │  │  │  🟩🟩🟫🟫🟫🟩🟩            │  │ │
+│  │  │  🟩🟩🟩🟩🟩🟩 │  │  │  🟩🟫🟫🟫🟫🟫🟩            │  │ │
+│  │  │  🟩🟩🟩🟩🟩🟩 │  │  │  🟩🟩🟫🟫🟫🟩🟩            │  │ │
+│  │  │                │  │  │                            │  │ │
+│  │  └────────────────┘  │  └────────────────────────────┘  │ │
+│  └──────────────────────┴──────────────────────────────────┘ │
+│                                                              │
+│  ◄━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━►  (slider arrastável) │
+│                                                              │
+│  📊 Diferença detectada: 12.5 ha de desmate                  │
+│  📅 Período: 2017 → 2025 (8 anos)                           │
+│  📈 Taxa: 1.56 ha/ano                                        │
+│                                                              │
+│  [📸 Salvar comparação (PNG)]  [📥 Baixar ambas imagens]     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Split view:**
+- Slider vertical/horizontal arrastável para revelar antes/depois
+- Satélites diferentes em cada lado (ex: Landsat vs Sentinel)
+- Anos diferentes em cada lado
+- Sincronização de zoom/pan entre os dois mapas
+
+##### 🌿 Modo NDVI (Índice de Vegetação)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  🌿 NDVI — Índice de Vegetação por Diferença Normalizada     │
+│                                                              │
+│  Satélite: [Sentinel-2 NIR ▼]  Ano: [2024 ▼]                │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │              ░░░░  MAPA NDVI  ░░░░                        ││
+│  │                                                          ││
+│  │  Escala:                                                  ││
+│  │  🔴 -1.0 (água/solo exposto)                              ││
+│  │  🟠 -0.2 (vegetação rala)                                 ││
+│  │  🟡  0.2 (pastagem)                                       ││
+│  │  🟢  0.5 (vegetação densa)                                ││
+│  │  🟩  0.8+ (floresta preservada)                           ││
+│  │                                                          ││
+│  │  ┌──────────────────────────────────┐                    ││
+│  │  │ Área desmatada: NDVI caiu de     │                    ││
+│  │  │ 0.72 → 0.15 entre 2023 e 2024   │                    ││
+│  │  └──────────────────────────────────┘                    ││
+│  └──────────────────────────────────────────────────────────┘│
+│                                                              │
+│  📈 Gráfico de tendência NDVI:                               │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │ 0.8┤     ●──●──●                                         ││
+│  │ 0.6┤                ●──●                                 ││
+│  │ 0.4┤                      ●                              ││
+│  │ 0.2┤                          ●──●──●                    ││
+│  │ 0.0┤                                                    ││
+│  │    2016  2018  2020  2022  2024  2026                    ││
+│  └──────────────────────────────────────────────────────────┘│
+│                                                              │
+│  📊 Estatísticas:                                            │
+│  NDVI médio 2024: 0.42  |  NDVI médio 2016: 0.68            │
+│  Perda de vegetação: 38% em 8 anos                           │
+│                                                              │
+│  [📥 Exportar dados NDVI (CSV)]  [📊 Gerar laudo técnico]    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**NDVI usa as camadas NIR (infravermelho próximo):**
+- `Mosaicos:Geoportal_Sentinel_2_20XX_NIR` (2016-2025)
+- Cálculo: NDVI = (NIR - RED) / (NIR + RED)
+- Visualização em falsa-cor (gradiente vermelho→verde)
+- Gráfico de tendência ao longo dos anos
+- Estatísticas por polígono do CAR
+
+##### 🗺️ Multi-camada (Overlay)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  🗺️ Overlay de camadas                                       │
+│                                                              │
+│  ☑ Satélite base: Sentinel-2 2024                           │
+│  ☑ Polígono do CAR (emerald, 20%)                           │
+│  ☑ Alertas SCCON (marcadores coloridos)                     │
+│  ☐ Embargos SEMA (hachura vermelha)                         │
+│  ☐ Terras Indígenas (hachura laranja)                       │
+│  ☐ Unidades de Conservação (hachura verde)                  │
+│  ☐ Assentamentos INCRA (hachura azul)                       │
+│  ☐ Desmatamento histórico SEMA (2012-2018)                  │
+│  ☐ Autorizações de desmate (polígonos amarelos)             │
+│                                                              │
+│  Transparência do overlay: ████████░░ 80%                    │
+│                                                              │
+│  [🔄 Atualizar mapa]  [📸 Salvar visualização]               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+##### 📥 Downloads da aba Satélite
+
+| Recurso | Formato | Descrição |
+|---------|---------|-----------|
+| Frame atual | PNG, GeoTIFF | Imagem de satélite com polígono sobreposto |
+| Timelapse | GIF, MP4 | Animação dos anos selecionados |
+| Comparação | PNG | Imagem lado a lado com slider |
+| NDVI | PNG, CSV | Mapa NDVI + dados numéricos |
+| Laudo técnico | PDF | Relatório com imagens, NDVI, análise de desmate |
+
+##### 🧠 Análise Inteligente (Futuro)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  🤖 Análise automática de desmatamento                        │
+│                                                              │
+│  Comparando: Sentinel-2 2023 vs 2024                         │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │ 🔴 Áreas com perda de vegetação: 3 polígonos             ││
+│  │    ▸ Polígono A: 8.2 ha (NDVI: 0.71 → 0.12)             ││
+│  │    ▸ Polígono B: 3.1 ha (NDVI: 0.65 → 0.18)             ││
+│  │    ▸ Polígono C: 1.2 ha (NDVI: 0.58 → 0.22)             ││
+│  │                                                          ││
+│  │ 🟢 Áreas com regeneração: 1 polígono                     ││
+│  │    ▸ Polígono D: 0.8 ha (NDVI: 0.15 → 0.41)             ││
+│  │                                                          ││
+│  │ 📊 Total desmatado: 12.5 ha | Regenerado: 0.8 ha         ││
+│  │ 📅 Período analisado: 01/2023 a 12/2024                  ││
+│  └──────────────────────────────────────────────────────────┘│
+│                                                              │
+│  ⚠️ Disclaimer: Análise preliminar. Consulte engenheiro      │
+│  florestal para laudo oficial.                               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+Algoritmo: diferença de NDVI entre dois anos, threshold de 0.3, clusterização dos pixels alterados, cálculo de área.
+
+---
+
+### 8. Página de Análise Temporal (`/dashboard/timelapse/:id`) 🆕
+
+Página dedicada para análise histórica completa:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  📅 Análise Temporal — Fazenda São João (MT27827/2017)       │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │ 📊 Dashboard de desmatamento histórico                    ││
+│  │                                                          ││
+│  │  ┌──────────────────────────────────────────────────┐   ││
+│  │  │ Gráfico: Área desmatada por ano (ha)              │   ││
+│  │  │                                                    │   ││
+│  │  │  ██                                                │   ││
+│  │  │  ██ ██    ██                                       │   ││
+│  │  │  ██ ██ ██ ██ ██    ██ ██ ████                     │   ││
+│  │  │  16 17 18 19 20 21 22 23 24 25                    │   ││
+│  │  └──────────────────────────────────────────────────┘   ││
+│  │                                                          ││
+│  │  ┌──────────────────────┐ ┌────────────────────────────┐ ││
+│  │  │ 🏆 Recordes          │ │ 📈 Tendência                │ ││
+│  │  │ Maior desmate: 2024  │ │ ↑ Acelerando                │ ││
+│  │  │ 12.5 ha              │ │ Média: 5.2 ha/ano           │ ││
+│  │  │ Menor: 2017 (0 ha)   │ │ Projeção 2026: ~18 ha       │ ││
+│  │  └──────────────────────┘ └────────────────────────────┘ ││
+│  └──────────────────────────────────────────────────────────┘│
+│                                                              │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │ 🛰️ Satélite: Sentinel-2 | Linha do tempo 2016-2025      ││
+│  │                                                          ││
+│  │  ┌──────┐┌──────┐┌──────┐┌──────┐┌──────┐              ││
+│  │  │ 2016 ││ 2018 ││ 2020 ││ 2022 ││ 2024 │ ...          ││
+│  │  │🟩🟩🟩││🟩🟩🟩││🟩🟫🟩││🟫🟫🟩││🟫🟫🟫│              ││
+│  │  │🟩🟩🟩││🟩🟩🟩││🟩🟫🟫││🟫🟫🟫││🟫🟫🟫│              ││
+│  │  └──────┘└──────┘└──────┘└──────┘└──────┘              ││
+│  │  Click em qualquer ano para ampliar                      ││
+│  └──────────────────────────────────────────────────────────┘│
+│                                                              │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │ 📋 Linha do tempo de eventos                              ││
+│  │                                                          ││
+│  │  2016 ─── CAR cadastrado (3.200 ha)                      ││
+│  │  2018 ─── 🟡 2.1 ha queimada (BURN_SCAR)                ││
+│  │  2019 ─── 🔴 5.3 ha desmate (CUT) detectado             ││
+│  │  2020 ─── 🟠 1.8 ha degradação                          ││
+│  │  2021 ─── ✅ ano sem ocorrências                         ││
+│  │  2022 ─── 🔴 8.7 ha desmate (CUT) detectado             ││
+│  │  2023 ─── 🟡 4.2 ha queimada                            ││
+│  │  2024 ─── 🔴🔴 12.5 ha + 3.2 ha desmate                ││
+│  │  2025 ─── 🔴 6.1 ha desmate (até julho)                ││
+│  │                                                          ││
+│  └──────────────────────────────────────────────────────────┘│
+│                                                              │
+│  [📄 Gerar Laudo Histórico (PDF)]  [📥 Exportar dados]       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 9. Widget de Satélite no Dashboard 🆕
+
+Mini-visualização inline nos cards do dashboard:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  🔵 MT27827/2017                                           │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌─────┐ │  │
+│  │ │🟩 2020 │→│🟩 2021 │→│🟫 2022 │→│🟫 2023 │→│🟫24 │ │  │
+│  │ └────────┘ └────────┘ └────────┘ └────────┘ └─────┘ │  │
+│  │ ░░░░░░ Mini timelapse (5 anos recentes) ░░░░░░░░░░░░ │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  📍 Cuiabá - MT  •  📐 2.847 ha  •  🔴 3 novos          │
+│  [🔍 Verificar] [📋 Alertas] [🛰️ Satélite] [✕]         │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 10. Novas Rotas de Satélite (Backend)
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/api/cars/:id/satellite/capabilities` | Listar satélites e anos disponíveis |
+| GET | `/api/cars/:id/satellite/timelapse?sat=sentinel&from=2016&to=2025` | Gerar GIF animado |
+| GET | `/api/cars/:id/satellite/compare?sat1=landsat8&year1=2017&sat2=sentinel&year2=2024` | Imagem split-view |
+| GET | `/api/cars/:id/satellite/ndvi?year=2024` | Mapa NDVI + dados |
+| GET | `/api/cars/:id/satellite/frame?sat=sentinel&year=2024&format=png` | Frame único |
+| GET | `/api/cars/:id/satellite/analysis?from=2023&to=2024` | Análise automática de mudança |
 
 #### Aba 5: 📄 Documentos
 
