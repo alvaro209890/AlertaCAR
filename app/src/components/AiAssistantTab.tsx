@@ -4,6 +4,7 @@ import { apiFetch, apiStream } from '../lib/api'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 type Risk = { score: number; band: string; explanation: string; cached: boolean }
+type Laudo = { id: string; contentMd: string; status: 'rascunho' | 'final'; updatedAt: string }
 
 const BAND_STYLE: Record<string, string> = {
   baixo: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
@@ -17,15 +18,17 @@ export default function AiAssistantTab({ carId }: { carId: string }) {
   const [risk, setRisk] = useState<Risk | null>(null)
   const [output, setOutput] = useState('')
   const [laudoId, setLaudoId] = useState<string | null>(null)
+  const [laudos, setLaudos] = useState<Laudo[]>([])
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [question, setQuestion] = useState('')
   const [threadId, setThreadId] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([apiFetch('/ai/status'), apiFetch(`/cars/${carId}/risk-score`)]).then(([status, score]) => {
+    Promise.all([apiFetch('/ai/status'), apiFetch(`/cars/${carId}/risk-score`), apiFetch(`/cars/${carId}/ai/laudos`)]).then(([status, score, drafts]) => {
       setConfigured(Boolean(status.configured))
       if (score.score !== undefined) setRisk(score)
+      if (Array.isArray(drafts.laudos)) setLaudos(drafts.laudos)
     })
   }, [carId])
 
@@ -36,7 +39,10 @@ export default function AiAssistantTab({ carId }: { carId: string }) {
     const text = response.summary || response.recommendations || response.laudo?.contentMd
     if (text) {
       setOutput(text)
-      setLaudoId(typeof response.laudo?.id === 'string' ? response.laudo.id : null)
+      if (typeof response.laudo?.id === 'string') {
+        setLaudoId(response.laudo.id)
+        setLaudos((current) => [response.laudo, ...current.filter((draft) => draft.id !== response.laudo.id)])
+      } else setLaudoId(null)
     }
     else toast.error(response.error || 'Não foi possível gerar a análise')
   }
@@ -46,7 +52,10 @@ export default function AiAssistantTab({ carId }: { carId: string }) {
     setLoadingAction('save-laudo')
     const response = await apiFetch(`/ai/laudos/${laudoId}`, { method: 'PATCH', body: JSON.stringify({ contentMd: output }) })
     setLoadingAction(null)
-    if (response.laudo) toast.success('Rascunho salvo')
+    if (response.laudo) {
+      setLaudos((current) => current.map((draft) => draft.id === response.laudo.id ? response.laudo : draft))
+      toast.success('Rascunho salvo')
+    }
     else toast.error(response.error || 'Não foi possível salvar o laudo')
   }
 
@@ -104,6 +113,18 @@ export default function AiAssistantTab({ carId }: { carId: string }) {
               {loadingAction === 'laudo' ? 'Gerando...' : 'Minuta de laudo'}
             </button>
           </div>
+          {laudos.length > 0 && (
+            <label className="mt-4 block text-sm text-slate-400">
+              Rascunhos salvos
+              <select className="input-field mt-1 py-2" value={laudoId || ''} onChange={(event) => {
+                const draft = laudos.find((item) => item.id === event.target.value)
+                if (draft) { setLaudoId(draft.id); setOutput(draft.contentMd) }
+              }}>
+                <option value="">Selecione um rascunho</option>
+                {laudos.map((draft) => <option key={draft.id} value={draft.id}>{new Date(draft.updatedAt).toLocaleString('pt-BR')} - {draft.status}</option>)}
+              </select>
+            </label>
+          )}
           {output && (laudoId ? (
             <div className="mt-4 space-y-2">
               <textarea className="input-field min-h-80 resize-y font-mono text-sm leading-6" value={output} onChange={(event) => setOutput(event.target.value)} disabled={loadingAction !== null} aria-label="Minuta de laudo editável" />
