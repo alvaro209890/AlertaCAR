@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import db from '../db/connection.js'
 import { fetchCarPolygon } from '../services/wfs-sema.js'
+import { formatAlertWithSeverity } from './alerts.js'
 
 const router = Router()
 
@@ -139,7 +140,7 @@ router.get('/:id', (req: AuthRequest, res) => {
 
     res.json({
       car: formatCar(car),
-      alerts: alerts.map(formatAlert),
+      alerts: alerts.map(formatAlertWithSeverity),
       layers: layers.map(formatLayer),
       licenses: licenses.map(formatLicense),
       sobreposicoes: sobreposicoes.map(formatSobreposicao),
@@ -155,6 +156,32 @@ router.get('/:id', (req: AuthRequest, res) => {
   } catch (err: any) {
     console.error('[cars] GET/:id error:', err)
     res.status(500).json({ error: 'Erro ao buscar CAR' })
+  }
+})
+
+// PATCH /api/cars/:id — Atualizar apelido (Fase 5.5)
+router.patch('/:id', (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id
+    const carId = req.params.id
+    const { nickname } = req.body as { nickname?: string }
+
+    const car = db.prepare('SELECT id FROM cars WHERE id = ? AND user_id = ? AND active = 1').get(carId, userId) as any
+    if (!car) {
+      res.status(404).json({ error: 'CAR não encontrado' })
+      return
+    }
+
+    if (nickname !== undefined) {
+      const trimmed = String(nickname).trim().slice(0, 100)
+      db.prepare('UPDATE cars SET nickname = ? WHERE id = ?').run(trimmed || null, carId)
+    }
+
+    const updated = db.prepare('SELECT * FROM cars WHERE id = ?').get(carId) as any
+    res.json({ car: formatCar(updated) })
+  } catch (err: any) {
+    console.error('[cars] PATCH error:', err)
+    res.status(500).json({ error: 'Erro ao atualizar CAR' })
   }
 })
 
@@ -237,6 +264,7 @@ function formatCar(row: any) {
     id: row.id,
     carNumber: row.car_number,
     carNumberWfs: row.car_number_wfs,
+    nickname: row.nickname || null,
     polygon: row.polygon_json ? JSON.parse(row.polygon_json) : null,
     areaHa: row.area_ha,
     municipality: row.municipality,
@@ -279,24 +307,6 @@ function formatSobreposicao(row: any) {
     intersectionHa: row.intersection_ha,
     coveragePercent: row.coverage_percent,
     updatedAt: row.updated_at,
-  }
-}
-
-function formatAlert(row: any) {
-  return {
-    id: row.id,
-    carId: row.car_id,
-    source: row.source,
-    sourceId: row.source_id,
-    classType: row.class_type,
-    title: row.title,
-    description: row.description,
-    detectedDate: row.detected_date,
-    areaHa: row.area_ha,
-    geometry: row.geometry_json ? JSON.parse(row.geometry_json) : null,
-    sentToWhatsapp: row.sent_to_whatsapp,
-    sentAt: row.sent_at,
-    createdAt: row.created_at,
   }
 }
 

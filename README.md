@@ -39,8 +39,8 @@ consultor não precisa logar em 5 sistemas diferentes por imóvel, todo dia, par
 | 1 | ✅ | Auth local + monorepo base |
 | 2 | ✅ | CRUD CARs + WFS SEMA (polígono) |
 | 3 | ✅ | SCCON monitoramento + cron diário |
-| 4 | 🚧 backend pronto | Fontes expandidas — SEMA multicamada + camadas do CAR + conformidade ARL (validado ao vivo); faltam INPE, vizinhança e a UI que consuma os novos dados |
-| 5 | ⏳ | Detalhes do CAR + Mapa + Workflow de alertas |
+| 4 | ✅ backend | Fontes expandidas — SEMA multicamada + camadas do CAR + conformidade ARL (validado ao vivo); faltam INPE e vizinhança |
+| 5 | 🚧 core pronto | Página de Detalhes (5 abas), Mapa Leaflet + camadas SEMA no navegador, workflow de alertas (status/severidade/notas), apelido — faltam score de risco (IA), satélite, anexos, cluster de marcadores |
 | 6 | ⏳ | Satélite / NDVI / Timelapse |
 | 7 | ⏳ | IA robusta (DeepSeek V4 Flash) |
 | 8 | ⏳ | Gestão de Carteira (consultor) |
@@ -107,7 +107,8 @@ Banco_de_dados/AlertaCAR/               # Dados (fora do repo)
 | Auth local | ✅ | Register + login + JWT + requireAuth |
 | CRUD CARs | ✅ | POST/GET/DELETE + WFS automático |
 | Cron monitoramento | ✅ | node-cron 06:00 GMT-3 (SCCON + Fase 4) |
-| WFS multicamada (Fase 4) | ✅ | 61 testes unitários + validado ao vivo: CAR real MT8019/2017 → ARL 930,68 ha, bioma Amazônia, déficit ARL zerado, 9 autorizações únicas, 5 camadas do CAR com área |
+| WFS multicamada (Fase 4) | ✅ | 45 testes unitários + validado ao vivo: CAR real MT8019/2017 → ARL 930,68 ha, bioma Amazônia, déficit ARL zerado, 9 autorizações únicas, 5 camadas do CAR com área |
+| Workflow de alertas (Fase 5) | ✅ | 56 testes (backend, total) + PATCH status/notas validado ao vivo (status inválido → 400, filtros por fonte/status funcionando); build + typecheck do app limpos |
 
 ## 🚀 Como rodar
 

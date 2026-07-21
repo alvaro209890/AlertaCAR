@@ -1,15 +1,46 @@
 # Frontend — App do Usuário
 
+## Estado real (Fase 5, implementado em 21/07/2026)
+
+O app deixou de ser um único `App.tsx` — estrutura real hoje:
+
+```
+app/src/
+├── lib/
+│   ├── api.ts          # apiFetch + API base
+│   ├── auth.tsx         # AuthProvider/useAuth
+│   ├── types.ts         # Car, Alert, CarLayer, CarLicense, CarSobreposicao, Conformidade
+│   └── sema-layers.ts   # 🆕 catálogo curado de camadas WMS SEMA p/ overlay no mapa
+├── components/
+│   ├── CarMap.tsx        # 🆕 Leaflet + WMSTileLayer (camadas SEMA ao vivo) + alertas
+│   └── AlertsPanel.tsx   # 🆕 timeline com filtros, severidade, status, notas
+├── pages/
+│   ├── LoginPage.tsx · RegisterPage.tsx
+│   ├── DashboardPage.tsx     # carteira simples (Fase 8 vai expandir)
+│   └── CarDetailPage.tsx     # 🆕 /dashboard/cars/:id — 5 abas
+└── App.tsx              # só roteamento (wouter)
+```
+
+**Implementado de verdade** (não mockup): rota `/dashboard/cars/:id` com abas **Visão Geral · Alertas ·
+Mapa · Camadas · Config** — dados reais do backend (Fase 4): conformidade de ARL, camadas do CAR,
+licenças com urgência, sobreposições fundiárias, alertas com severidade calculada e workflow de status
+(novo/em análise/validado/falso positivo/resolvido). Mapa com polígono do CAR + alertas como marcadores +
+overlay de camadas SEMA ao vivo (`WMSTileLayer` direto no navegador, sem proxy).
+
+**Ainda mockup/futuro** (Fases 6, 7, 9, 10, 11): aba Satélite/NDVI/Timelapse, aba Documentos, aba IA,
+downloads, notificações browser, PWA — as seções abaixo descrevem a visão completa; o que está riscado
+como implementado acima já existe em código.
+
 ## Stack
 
 - React 19 + Vite + TypeScript
-- Tailwind CSS + shadcn/ui (mesmo padrão GeoForest)
+- Tailwind CSS (utilitário direto — sem shadcn/ui ainda; ver `index.css` p/ tokens `glass-card`/`btn-primary`/`input-field`)
 - Auth local: email/senha → JWT no localStorage
 - Wouter (roteamento leve)
-- Leaflet + react-leaflet (mapa)
-- Sonner (toast notifications)
-- Recharts (gráficos de timeline)
-- file-saver + jszip (downloads)
+- Leaflet + react-leaflet 5 (mapa) — 🆕 instalado na Fase 5
+- react-hot-toast (toast notifications — **não** Sonner, apesar do que versões antigas deste doc diziam)
+- Recharts (gráficos de timeline) — ainda não instalado, entra nas Fases 6/8
+- file-saver + jszip (downloads) — ainda não instalado, entra na Fase 9
 
 ## Design System
 

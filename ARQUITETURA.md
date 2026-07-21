@@ -144,7 +144,8 @@ CREATE TABLE cars (
   arl_exigida_ha REAL,               -- area_ha × arl_exigida_percent / 100
   arl_declarada_ha REAL,             -- soma de Geoportal:CAR_ARL
   deficit_arl_ha REAL,               -- max(0, arl_exigida_ha - arl_declarada_ha)
-  layers_updated_at TEXT
+  layers_updated_at TEXT,
+  nickname TEXT                      -- Fase 5.5 🆕: apelido do imóvel (ex. "Fazenda São João")
 );
 
 -- Fase 4 🆕: camadas do próprio CAR (ARL/APP/AVN/AUAS/...) — área por camada
@@ -201,7 +202,11 @@ CREATE TABLE alerts (
   geometry_json TEXT,
   sent_to_whatsapp INTEGER DEFAULT 0,
   sent_at TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT (datetime('now')),
+  -- Fase 5.4 🆕: workflow profissional (colunas via ALTER idempotente)
+  status TEXT DEFAULT 'novo',        -- 'novo'|'em_analise'|'validado'|'falso_positivo'|'resolvido'
+  notes TEXT                         -- anotações de campo / parecer do consultor
+  -- severidade NÃO é persistida — calculada em runtime por computeSeverity() (lib/severity.ts)
 );
 
 -- Sessão WhatsApp Baileys

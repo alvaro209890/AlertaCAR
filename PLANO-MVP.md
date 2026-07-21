@@ -6,19 +6,18 @@
 
 ---
 
-## 0. Estado real (auditado em 21/07/2026, atualizado após início da Fase 4)
+## 0. Estado real (auditado em 21/07/2026, atualizado após Fases 4 e 5)
 
 O que está **de fato implementado em código** (não só documentado):
 
 | Camada | Implementado | Ainda não existe |
 |--------|--------------|------------------|
-| **Backend** | Auth local (bcrypt+JWT), CRUD de CARs, `fetchCarPolygon` (WFS `CAR_ATP`), serviço SCCON, cron diário 06:00 (SCCON + Fase 4), `/api/admin/stats`. **Fase 4**: motor WFS genérico de interseção, camadas do CAR (ARL/APP/APPD/APPRL/AVN/AUAS/AU/NASCENTE/AREA_CONSOLIDADA) com conformidade de Reserva Legal, embargos/desembargos/infrações/notificações/autorizações/licenciamento (com urgência de vencimento)/sobreposições fundiárias — tudo testado (61 testes) e validado ao vivo contra o WFS real | Downloads, satélite/NDVI, WhatsApp/Baileys, fila de notificação, IA |
-| **App cliente** | Login, Cadastro, Dashboard (lista de CARs, 3 stats, add/remove, "Verificar SCCON", timeline expansível) — arquivo único `App.tsx`. Backend da Fase 4 pronto mas **ainda sem UI** que o consuma | Página de Detalhes, mapa Leaflet, satélite, workflow de alertas, carteira, IA, perfil, exports, PWA |
+| **Backend** | Auth local, CRUD de CARs (+ apelido), SCCON, cron diário (SCCON + Fase 4), `/api/admin/stats`. **Fase 4**: motor WFS de interseção, camadas do CAR + conformidade de ARL, embargos/desembargos/infrações/notificações/autorizações/licenciamento (urgência)/sobreposições fundiárias. **Fase 5**: severidade calculada (`lib/severity.ts`), workflow de status/notas por alerta (`PATCH /api/alerts/:id`), listagem paginada+filtrada (`GET /api/cars/:id/alerts`) — 56 testes no total, tudo validado ao vivo | Downloads, satélite/NDVI, WhatsApp/Baileys, fila de notificação, IA |
+| **App cliente** | Login, Cadastro, Dashboard (carteira simples, link p/ detalhe). **Fase 5**: página `/dashboard/cars/:id` real com 5 abas (Visão Geral, Alertas, Mapa, Camadas, Config) — reestruturado em `lib/`/`components/`/`pages/`, mapa Leaflet com camadas SEMA ao vivo, workflow de triagem de alertas, apelido | Satélite/NDVI, IA, documentos, exports, PWA, carteira avançada |
 | **Admin** | Placeholder mínimo (154 linhas) | Todo o painel |
 
-**Tradução:** Fases 1–3 concluídas; Fase 4 (backend) concluída e validada ao vivo em 21/07/2026 — falta
-só a UI que exiba os novos dados. O restante da documentação era **visão**, não código.
-Este plano reorganiza e **amplia muito** essa visão, com foco no consultor e em IA robusta.
+**Tradução:** Fases 1–5 com backend e frontend core funcionando de ponta a ponta contra dados reais.
+O restante da documentação é **visão** das Fases 6–13, ainda não codificada.
 
 ### Persona-alvo (decisão do produto)
 **Consultor / Engenheiro florestal** — profissional que gerencia dezenas/centenas de imóveis de clientes.
@@ -152,46 +151,46 @@ Objetivo: transformar o AlertaCAR de "monitor de desmate" em **monitor ambiental
 A página mais rica do app. Rota `/dashboard/cars/:id` com abas:
 **Visão Geral · Alertas · Mapa · Satélite · Camadas · IA · Documentos · Config**
 
-### 5.1 Página de Detalhes (shell + Visão Geral)
-- [ ] Header: nº CAR, município, área, status, último check, ações rápidas
-- [ ] Aba **Visão Geral**: score de risco (IA), cards por classe, gráfico 12 meses, status das integrações, déficit ARL/APP
-- [ ] Lazy-load por aba (code splitting)
+### 5.1 Página de Detalhes (shell + Visão Geral) ✅ parcial
+- [x] Header: nº CAR/apelido, município, área, último check, ação rápida "Forçar verificação" — `pages/CarDetailPage.tsx`
+- [x] Aba **Visão Geral**: cards por severidade (crítico/alto/médio), conformidade de ARL, sobreposições, status das integrações — [ ] score de risco (IA, Fase 7), [ ] gráfico 12 meses, [ ] passivo em APP
+- [ ] Lazy-load por aba (code splitting) — abas trocam por estado local, sem `React.lazy` ainda
 
-### 5.2 Mapa interativo (Leaflet) + camadas SEMA no navegador ⭐⭐
-> Reusar o viewer WMS do GeoForest: `/api/map/capabilities` (catálogo de camadas classificado) +
-> `parseLayersFromCapabilities`. Ver [CAMADAS-SEMA.md §4](./CAMADAS-SEMA.md).
-- [ ] Polígono do CAR (emerald, fill 15%) sempre visível
-- [ ] Alertas como `CircleMarker` coloridos por classe; cluster acima de 50
-- [ ] **Camadas SEMA ao vivo via `WMSTileLayer`** (GetMap direto no WMS SEMA c/ `authkey`): embargos, autos, licenças, autorizações, TI/UC/assentamentos, desmate histórico, hidrografia — **qualquer uma das 135 camadas WFS/WMS**
-- [ ] **Controle de camadas dinâmico** populado por `/api/map/capabilities`; slider de **opacidade** por overlay
-- [ ] Base layers: satélite (mosaicos SEMA) / OSM / relevo (`SEMAMT:ALOS_PALSAR_DEM`)
-- [ ] `POST /api/cars/:id/map/snapshot` — GetMap (base + até 8 overlays + bbox) → PNG p/ laudo/IA/thumbnail (portar `/api/map/snapshot`)
-- [ ] Popup com dados do alerta + link "ver detalhes"
-- [ ] Mini-mapa overview, botões "Zoom to CAR" / "Zoom to alerts"
-- [ ] Ferramenta de medição (distância/área) e de desenho (marcar ponto de interesse)
+### 5.2 Mapa interativo (Leaflet) + camadas SEMA no navegador ⭐⭐ ✅ parcial
+> Implementado com catálogo **curado estático** (`lib/sema-layers.ts`), não o parser dinâmico de
+> `GetCapabilities` do GeoForest — mais simples e já cobre o essencial; portar `parseLayersFromCapabilities`
+> fica para quando o catálogo dinâmico completo (135 camadas) for necessário. Ver [CAMADAS-SEMA.md §4](./CAMADAS-SEMA.md).
+- [x] Polígono do CAR (emerald, fill 15%) sempre visível — `components/CarMap.tsx`
+- [x] Alertas como `CircleMarker` coloridos por severidade — [ ] cluster acima de 50
+- [x] **Camadas SEMA ao vivo via `WMSTileLayer`** direto do navegador (sem proxy): embargos, desembargos, autorizações, TI/UC, assentamentos, camadas do CAR (ARL/APP/AVN/AUAS), desmate histórico — catálogo curado de 12 camadas (não as 135 dinamicamente)
+- [x] Controle de camadas por categoria (checkboxes) + slider de **opacidade global**; [ ] catálogo dinâmico via `/api/map/capabilities`, [ ] opacidade por overlay individual
+- [x] Base layers: OSM + 2 mosaicos de satélite (Sentinel-2 2024, Landsat 5 2011) — [ ] relevo DEM
+- [ ] `POST /api/cars/:id/map/snapshot` — ainda não portado (fica para quando o laudo PDF da Fase 9 precisar)
+- [x] Popup com dados do alerta (título, data, área, severidade) — [ ] link "ver detalhes"
+- [x] Auto-fit do zoom ao polígono do CAR — [ ] mini-mapa overview, [ ] botões "Zoom to alerts"
+- [ ] Ferramenta de medição (distância/área) e de desenho
 
-### 5.3 Aba Camadas (novo) ⭐
-> Fonte: 44 camadas `CAR_*`/`SIMCAR_*` no WFS (ver [CAMADAS-SEMA.md §2](./CAMADAS-SEMA.md)); área exata por
-> interseção (Fase 4.0). Recorte completo pode reusar `GeoForest/backend/simcar-clip.ts` (TEMPLATE_LAYERS).
-- [ ] Listar todas as camadas do CAR (ATP/ARL/APP/APPD/APPRL/AUAS/AVN/AU/nascentes/consolidada) com área de cada
-- [ ] Toggle de visibilidade por camada no mapa (WMS overlay)
-- [ ] Quadro de conformidade: ARL exigida vs declarada, passivo em APP, área antropizada (`ABERTURA` da AUAS)
+### 5.3 Aba Camadas (novo) ⭐ ✅ parcial
+> Fonte: camadas `CAR_*` já buscadas na Fase 4 (área exata por atributo, não por interseção espacial).
+- [x] Listar todas as camadas do CAR com área e nº de feições — tabela em `pages/CarDetailPage.tsx`
+- [x] Toggle de visibilidade por camada no mapa (via overlay do catálogo curado)
+- [x] Quadro de conformidade: ARL exigida vs declarada e déficit (aba Visão Geral) — [ ] passivo em APP, [ ] indicador visual de área antropizada pós-2008 (dado já existe em `extra.maisRecenteAberturaAno`, falta exibir)
 
-### 5.4 Workflow profissional de alertas ⭐⭐
-- [ ] **Ciclo de vida**: `novo → em análise → validado → falso positivo → resolvido` (o consultor triagem)
-- [ ] **Severidade calculada**: classe × área × recência × sobreposição com APP/ARL/áreas restritas
-- [ ] **Cruzamento automático com autorizações**: alerta dentro de AUTEX/autorização → marca "provável legal"
-- [ ] **Notas e anexos** por alerta (parecer, fotos de campo, PDFs)
-- [ ] **Atribuir** alerta a um responsável (nome livre no modo uso-próprio)
-- [ ] **Agrupamento** de alertas próximos no tempo/espaço
-- [ ] Filtros avançados (classe, período, severidade, status, fonte) + **saved views**
-- [ ] Cada alerta expansível com mini-mapa; botões copiar coords / baixar GeoJSON
+### 5.4 Workflow profissional de alertas ⭐⭐ ✅ parcial
+- [x] **Ciclo de vida**: `novo → em_analise → validado → falso_positivo → resolvido` — `PATCH /api/alerts/:id`, dropdown em `AlertsPanel.tsx`
+- [x] **Severidade calculada**: classe base × área (`lib/severity.ts`, 8 testes) — [ ] ainda não pondera recência nem sobreposição com APP/ARL/áreas restritas
+- [ ] **Cruzamento automático com autorizações**: helper `alertaTemAutorizacao()` já existe no backend (Fase 4) mas **não está ligado** à triagem/severidade ainda
+- [x] **Notas** por alerta (textarea com autosave) — [ ] anexos/fotos (precisa de infra de upload, ainda não existe)
+- [ ] **Atribuir** responsável
+- [ ] **Agrupamento** de alertas próximos
+- [x] Filtros por fonte e status — [ ] filtro por classe/período/severidade, [ ] saved views
+- [ ] Mini-mapa por alerta expandido; [ ] botões copiar coords / baixar GeoJSON individual
 
-### 5.5 Config do CAR
-- [ ] Apelido, cliente/pasta, tags, cor
-- [ ] Preferências de notificação por classe/severidade/canal
+### 5.5 Config do CAR ✅ parcial
+- [x] Apelido (`PATCH /api/cars/:id`) — [ ] cliente/pasta, tags, cor (Fase 8 — carteira)
+- [ ] Preferências de notificação por classe/severidade/canal (Fase 10)
 - [ ] Frequência de verificação (diária/semanal/manual)
-- [ ] Zona de perigo: remover do monitoramento
+- [x] Zona de perigo: remover do monitoramento (reusa `DELETE /api/cars/:id` já existente)
 
 ---
 

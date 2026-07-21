@@ -134,6 +134,11 @@ export function initializeSchema() {
   addColumnIfMissing('cars', 'arl_declarada_ha', 'REAL')
   addColumnIfMissing('cars', 'deficit_arl_ha', 'REAL')
   addColumnIfMissing('cars', 'layers_updated_at', 'TEXT')
+  addColumnIfMissing('cars', 'nickname', 'TEXT')
+
+  // Fase 5: workflow profissional de alertas (status/notas)
+  addColumnIfMissing('alerts', 'status', "TEXT DEFAULT 'novo'")
+  addColumnIfMissing('alerts', 'notes', 'TEXT')
 }
 
 /** ALTER TABLE ADD COLUMN idempotente (SQLite não suporta "IF NOT EXISTS" em colunas). */

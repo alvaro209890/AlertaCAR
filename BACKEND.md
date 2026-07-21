@@ -22,8 +22,9 @@ backend/
 │   │   └── admin.ts               # requireAdmin: role check
 │   ├── routes/
 │   │   ├── auth.ts                # register, login, me
-│   │   ├── cars.ts                # CRUD + WFS lookup
-│   │   ├── alerts.ts              # listagem por CAR
+│   │   ├── cars.ts                # CRUD + WFS lookup + PATCH nickname
+│   │   ├── alerts.ts              # 🆕 GET filtrado+paginado, PATCH status/notas (Fase 5.4)
+│   │   ├── sema-monitor.ts        # 🆕 Força verificação multicamada (Fase 4)
 │   │   └── admin.ts               # stats, users, whatsapp
 │   ├── services/
 │   │   ├── sccon.ts               # Token + search + detalhes
@@ -44,7 +45,8 @@ backend/
 │   └── lib/
 │       ├── jwt.ts                 # sign + verify
 │       ├── bcrypt.ts              # hash + compare
-│       └── config.ts              # env vars tipadas
+│       ├── config.ts              # env vars tipadas
+│       └── severity.ts            # 🆕 computeSeverity() — classe base × área (Fase 5.4)
 ├── package.json
 └── tsconfig.json
 ```
@@ -78,7 +80,8 @@ Ver `ARQUITETURA.md` para schema completo.
 |--------|------|-----------|
 | GET | `/api/cars` | Listar CARs (com último alerta) |
 | POST | `/api/cars` | `{carNumber}` → busca WFS → salva |
-| GET | `/api/cars/:id` | Detalhes + GeoJSON + alertas |
+| GET | `/api/cars/:id` | Detalhes + GeoJSON + alertas + layers/licenses/sobreposicoes/conformidade (Fase 4) |
+| PATCH | `/api/cars/:id` | 🆕 `{nickname}` — apelido (Fase 5.5) |
 | DELETE | `/api/cars/:id` | Parar monitoramento (soft delete) |
 | PATCH | `/api/cars/:id/refresh` | Forçar re-consulta WFS |
 
@@ -106,11 +109,15 @@ SPOT, RESOURCESAT.
 | GET | `/api/cars/:id/satellite/frame?sat=sentinel&year=2024&format=png\|geotiff` | Frame único |
 | GET | `/api/cars/:id/satellite/analysis?from=2023&to=2024` | Análise automática de mudança (diferença NDVI) |
 
-### Alertas (autenticado)
+### Alertas (autenticado) — Fase 5.4 ✅
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/api/cars/:id/alerts` | Listar alertas (filtro por source, período) |
+| GET | `/api/cars/:id/alerts?source=&status=&classType=&limit=&offset=` | Timeline paginada com filtros; cada alerta traz `severity` (calculada) |
+| PATCH | `/api/alerts/:id` | Atualiza `status` (`novo`/`em_analise`/`validado`/`falso_positivo`/`resolvido`) e/ou `notes` — triagem do consultor |
+
+`GET /api/cars/:id` continua retornando os 20 alertas mais recentes embutidos (para o dashboard e a
+aba Mapa); a aba Alertas da página de detalhes usa o endpoint dedicado acima.
 
 ### SEMA Multicamada (autenticado) — Fase 4 🆕
 
