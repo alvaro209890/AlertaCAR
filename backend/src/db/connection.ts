@@ -188,6 +188,31 @@ export function initializeSchema() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- Fase 8: organização da carteira por cliente e tags reutilizáveis.
+    CREATE TABLE IF NOT EXISTS portfolio_clients (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#10b981',
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, name)
+    );
+
+    CREATE TABLE IF NOT EXISTS portfolio_tags (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#64748b',
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, name)
+    );
+
+    CREATE TABLE IF NOT EXISTS car_tag_links (
+      car_id TEXT NOT NULL REFERENCES cars(id) ON DELETE CASCADE,
+      tag_id TEXT NOT NULL REFERENCES portfolio_tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (car_id, tag_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_cars_user ON cars(user_id, active);
     CREATE INDEX IF NOT EXISTS idx_alerts_car ON alerts(car_id, detected_date);
     CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id, created_at);
@@ -199,6 +224,9 @@ export function initializeSchema() {
     CREATE INDEX IF NOT EXISTS idx_ai_threads_user ON ai_threads(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_ai_messages_thread ON ai_messages(thread_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_risk_scores_car ON risk_scores(car_id, computed_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_portfolio_clients_user ON portfolio_clients(user_id, name);
+    CREATE INDEX IF NOT EXISTS idx_portfolio_tags_user ON portfolio_tags(user_id, name);
+    CREATE INDEX IF NOT EXISTS idx_car_tag_links_tag ON car_tag_links(tag_id, car_id);
   `)
 
   addColumnIfMissing('cars', 'bioma', 'TEXT')
@@ -208,6 +236,7 @@ export function initializeSchema() {
   addColumnIfMissing('cars', 'deficit_arl_ha', 'REAL')
   addColumnIfMissing('cars', 'layers_updated_at', 'TEXT')
   addColumnIfMissing('cars', 'nickname', 'TEXT')
+  addColumnIfMissing('cars', 'client_id', 'TEXT REFERENCES portfolio_clients(id)')
 
   // Fase 5: workflow profissional de alertas (status/notas)
   addColumnIfMissing('alerts', 'status', "TEXT DEFAULT 'novo'")

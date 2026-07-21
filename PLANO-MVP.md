@@ -298,9 +298,9 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 O consultor não tem 1 imóvel: tem uma **carteira**. Toda a navegação assume isso.
 
 ### 8.1 Organização
-- [ ] **Clientes/Pastas**: agrupar CARs por cliente final (proprietário)
-- [ ] **Tags** e **cores** por imóvel; filtro e busca por cliente/tag/município
-- [ ] Renomear/apelidar imóvel
+- [x] **Clientes/Pastas**: agrupar CARs por cliente final (proprietário)
+- [ ] **Tags** e **cores** por imóvel; filtro e busca por cliente/tag/município — criação/atribuição e cores entregues; filtros e busca pendentes
+- [x] Renomear/apelidar imóvel
 
 ### 8.2 Importação em massa 🆕
 - [ ] Colar lista de nº de CAR (um por linha) → cria vários

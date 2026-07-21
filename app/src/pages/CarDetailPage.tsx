@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useParams } from 'wouter'
 import toast from 'react-hot-toast'
 import { apiFetch } from '../lib/api'
-import type { CarDetail } from '../lib/types'
+import type { CarDetail, PortfolioItem } from '../lib/types'
 import CarMap from '../components/CarMap'
 import AlertsPanel from '../components/AlertsPanel'
 import SatelliteTab from '../components/SatelliteTab'
@@ -224,6 +224,22 @@ function ConfigTab({ car, onUpdated }: { car: CarDetail['car']; onUpdated: () =>
   const [nickname, setNickname] = useState(car.nickname || '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [clients, setClients] = useState<PortfolioItem[]>([])
+  const [tags, setTags] = useState<PortfolioItem[]>([])
+  const [clientId, setClientId] = useState(car.client?.id || '')
+  const [tagIds, setTagIds] = useState<string[]>(car.tags.map((tag) => tag.id))
+  const [newClient, setNewClient] = useState('')
+  const [newTag, setNewTag] = useState('')
+  const [clientColor, setClientColor] = useState('#10b981')
+  const [tagColor, setTagColor] = useState('#64748b')
+  const [savingPortfolio, setSavingPortfolio] = useState(false)
+
+  const loadPortfolio = () => apiFetch('/portfolio').then((response) => {
+    if (Array.isArray(response.clients)) setClients(response.clients)
+    if (Array.isArray(response.tags)) setTags(response.tags)
+  })
+
+  useEffect(() => { loadPortfolio() }, [])
 
   const handleSave = async () => {
     setSaving(true)
@@ -242,6 +258,24 @@ function ConfigTab({ car, onUpdated }: { car: CarDetail['car']; onUpdated: () =>
     setLocation('/dashboard')
   }
 
+  const createItem = async (kind: 'clients' | 'tags') => {
+    const name = kind === 'clients' ? newClient.trim() : newTag.trim()
+    if (!name) return
+    const response = await apiFetch(`/portfolio/${kind}`, { method: 'POST', body: JSON.stringify({ name, color: kind === 'clients' ? clientColor : tagColor }) })
+    if (!response.item) return toast.error(response.error || 'Não foi possível criar item')
+    if (kind === 'clients') { setNewClient(''); setClientId(response.item.id) }
+    else { setNewTag(''); setTagIds((current) => [...current, response.item.id]) }
+    loadPortfolio()
+  }
+
+  const savePortfolio = async () => {
+    setSavingPortfolio(true)
+    const response = await apiFetch(`/cars/${car.id}/portfolio`, { method: 'PATCH', body: JSON.stringify({ clientId: clientId || null, tagIds }) })
+    setSavingPortfolio(false)
+    if (response.car) { toast.success('Carteira atualizada'); onUpdated() }
+    else toast.error(response.error || 'Erro ao atualizar carteira')
+  }
+
   return (
     <div className="space-y-6 max-w-lg">
       <div className="glass-card p-5">
@@ -250,6 +284,38 @@ function ConfigTab({ car, onUpdated }: { car: CarDetail['car']; onUpdated: () =>
           <input className="input-field" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Ex: Fazenda São João" />
           <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
         </div>
+      </div>
+
+      <div className="glass-card p-5 space-y-4">
+        <h3 className="font-semibold">Organização da carteira</h3>
+        <label className="block text-sm text-slate-400">Cliente
+          <select className="input-field mt-1" value={clientId} onChange={(event) => setClientId(event.target.value)}>
+            <option value="">Sem cliente</option>
+            {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+          </select>
+        </label>
+        <div className="flex gap-2">
+          <input className="input-field" value={newClient} onChange={(event) => setNewClient(event.target.value)} placeholder="Novo cliente" maxLength={100} />
+          <input className="h-11 w-12 shrink-0 cursor-pointer rounded border border-white/10 bg-transparent p-1" type="color" value={clientColor} onChange={(event) => setClientColor(event.target.value)} aria-label="Cor do cliente" />
+          <button className="btn-primary px-3 py-2 text-sm" onClick={() => createItem('clients')} disabled={!newClient.trim()}>Criar</button>
+        </div>
+        <div>
+          <p className="mb-2 text-sm text-slate-400">Tags</p>
+          <div className="flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <label key={tag.id} className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-sm" style={{ borderColor: tag.color, color: tag.color }}>
+                <input type="checkbox" checked={tagIds.includes(tag.id)} onChange={() => setTagIds((current) => current.includes(tag.id) ? current.filter((id) => id !== tag.id) : [...current, tag.id])} />
+                {tag.name}
+              </label>
+            ))}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <input className="input-field" value={newTag} onChange={(event) => setNewTag(event.target.value)} placeholder="Nova tag" maxLength={100} />
+            <input className="h-11 w-12 shrink-0 cursor-pointer rounded border border-white/10 bg-transparent p-1" type="color" value={tagColor} onChange={(event) => setTagColor(event.target.value)} aria-label="Cor da tag" />
+            <button className="btn-primary px-3 py-2 text-sm" onClick={() => createItem('tags')} disabled={!newTag.trim()}>Criar</button>
+          </div>
+        </div>
+        <div className="flex justify-end"><button className="btn-primary px-3 py-2 text-sm" onClick={savePortfolio} disabled={savingPortfolio}>{savingPortfolio ? 'Salvando...' : 'Salvar organização'}</button></div>
       </div>
 
       <div className="glass-card p-5 border border-red-500/20">

@@ -200,6 +200,14 @@ export default function DashboardPage() {
                           Risco {riskByCar[car.id].score}
                         </span>
                       )}
+                      {car.client && (
+                        <span className="text-xs px-2 py-0.5 rounded border" style={{ color: car.client.color, borderColor: car.client.color }}>
+                          {car.client.name}
+                        </span>
+                      )}
+                      {car.tags.map((tag) => (
+                        <span key={tag.id} className="text-xs px-2 py-0.5 rounded border" style={{ color: tag.color, borderColor: tag.color }}>{tag.name}</span>
+                      ))}
                     </div>
                     <div className="flex gap-4 text-sm text-slate-400">
                       {car.municipality && <span>📍 {car.municipality}</span>}

@@ -87,15 +87,16 @@ router.get('/', (req: AuthRequest, res) => {
 
     const cars = db.prepare(`
       SELECT c.*, 
+        pc.id AS client_id, pc.name AS client_name, pc.color AS client_color,
         (SELECT COUNT(*) FROM alerts a WHERE a.car_id = c.id) as alert_count,
         (SELECT COUNT(*) FROM alerts a WHERE a.car_id = c.id AND a.sent_to_whatsapp = 0) as unread_alerts
-      FROM cars c
+      FROM cars c LEFT JOIN portfolio_clients pc ON pc.id = c.client_id
       WHERE c.user_id = ? AND c.active = 1
       ORDER BY c.created_at DESC
     `).all(userId) as any[]
 
     res.json({
-      cars: cars.map(formatCar),
+      cars: cars.map((car) => formatCar(car, loadCarTags(car.id))),
       total: cars.length,
     })
   } catch (err: any) {
@@ -139,7 +140,7 @@ router.get('/:id', (req: AuthRequest, res) => {
     `).all(carId) as any[]
 
     res.json({
-      car: formatCar(car),
+      car: formatCar(car, loadCarTags(car.id), loadClient(car.client_id)),
       alerts: alerts.map(formatAlertWithSeverity),
       layers: layers.map(formatLayer),
       licenses: licenses.map(formatLicense),
@@ -156,6 +157,43 @@ router.get('/:id', (req: AuthRequest, res) => {
   } catch (err: any) {
     console.error('[cars] GET/:id error:', err)
     res.status(500).json({ error: 'Erro ao buscar CAR' })
+  }
+})
+
+// PATCH /api/cars/:id/portfolio — associa o imóvel a um cliente e tags do mesmo usuário.
+router.patch('/:id/portfolio', (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id
+    const carId = req.params.id
+    const car = db.prepare('SELECT id FROM cars WHERE id = ? AND user_id = ? AND active = 1').get(carId, userId) as any
+    if (!car) return void res.status(404).json({ error: 'CAR não encontrado' })
+
+    const clientId = req.body?.clientId === null || req.body?.clientId === '' ? null : typeof req.body?.clientId === 'string' ? req.body.clientId : undefined
+    const tagIds = Array.isArray(req.body?.tagIds) ? [...new Set(req.body.tagIds.filter((id: unknown) => typeof id === 'string'))] : undefined
+    if (clientId === undefined || tagIds === undefined || tagIds.length > 20) return void res.status(400).json({ error: 'Cliente ou tags inválidos' })
+
+    if (clientId) {
+      const client = db.prepare('SELECT id FROM portfolio_clients WHERE id = ? AND user_id = ?').get(clientId, userId)
+      if (!client) return void res.status(400).json({ error: 'Cliente inválido' })
+    }
+    if (tagIds.length) {
+      const placeholders = tagIds.map(() => '?').join(', ')
+      const count = (db.prepare(`SELECT COUNT(*) AS count FROM portfolio_tags WHERE user_id = ? AND id IN (${placeholders})`).get(userId, ...tagIds) as any).count
+      if (count !== tagIds.length) return void res.status(400).json({ error: 'Uma ou mais tags são inválidas' })
+    }
+
+    db.transaction(() => {
+      db.prepare('UPDATE cars SET client_id = ? WHERE id = ?').run(clientId, carId)
+      db.prepare('DELETE FROM car_tag_links WHERE car_id = ?').run(carId)
+      const insert = db.prepare('INSERT INTO car_tag_links (car_id, tag_id) VALUES (?, ?)')
+      for (const tagId of tagIds) insert.run(carId, tagId)
+    })()
+
+    const updated = db.prepare('SELECT * FROM cars WHERE id = ?').get(carId) as any
+    res.json({ car: formatCar(updated, loadCarTags(carId), loadClient(clientId)) })
+  } catch (err: any) {
+    console.error('[cars] PATCH portfolio error:', err)
+    res.status(500).json({ error: 'Erro ao atualizar organização da carteira' })
   }
 })
 
@@ -259,7 +297,7 @@ router.patch('/:id/refresh', async (req: AuthRequest, res) => {
 })
 
 // Helpers
-function formatCar(row: any) {
+function formatCar(row: any, tags = loadCarTags(row.id), client = loadClient(row.client_id)) {
   return {
     id: row.id,
     carNumber: row.car_number,
@@ -272,9 +310,23 @@ function formatCar(row: any) {
     unreadAlerts: row.unread_alerts || 0,
     lastPolygonFetch: row.last_polygon_fetch,
     lastCheckAt: row.last_check_at,
+    client,
+    tags,
     active: row.active,
     createdAt: row.created_at,
   }
+}
+
+function loadClient(clientId: string | null | undefined) {
+  if (!clientId) return null
+  const row = db.prepare('SELECT id, name, color FROM portfolio_clients WHERE id = ?').get(clientId) as any
+  return row ? { id: row.id, name: row.name, color: row.color } : null
+}
+
+function loadCarTags(carId: string) {
+  const rows = db.prepare(`SELECT t.id, t.name, t.color FROM portfolio_tags t
+    JOIN car_tag_links l ON l.tag_id = t.id WHERE l.car_id = ? ORDER BY t.name COLLATE NOCASE`).all(carId) as any[]
+  return rows.map((row) => ({ id: row.id, name: row.name, color: row.color }))
 }
 
 function formatLayer(row: any) {

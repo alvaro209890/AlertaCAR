@@ -12,6 +12,7 @@ import semaMonitorRoutes from './routes/sema-monitor.js'
 import alertsRoutes from './routes/alerts.js'
 import satelliteRoutes from './routes/satellite.js'
 import aiRoutes from './routes/ai.js'
+import portfolioRoutes from './routes/portfolio.js'
 import { startCronMonitor } from './cron/monitor.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -40,6 +41,7 @@ app.use('/api/sema-monitor', semaMonitorRoutes)
 app.use('/api', alertsRoutes)
 app.use('/api', satelliteRoutes)
 app.use('/api', aiRoutes)
+app.use('/api/portfolio', portfolioRoutes)
 
 // Servir frontends em produção
 if (config.nodeEnv === 'production') {

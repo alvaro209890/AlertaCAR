@@ -1,8 +1,13 @@
+export interface PortfolioItem {
+  id: string; name: string; color: string; carCount?: number
+}
+
 export interface Car {
   id: string; carNumber: string; carNumberWfs: string | null; nickname: string | null
   polygon: GeoJSON.Polygon | GeoJSON.MultiPolygon | null
   areaHa: number | null; municipality: string | null
   alertCount: number; unreadAlerts: number
+  client: PortfolioItem | null; tags: PortfolioItem[]
   lastPolygonFetch: string | null; lastCheckAt: string | null; createdAt: string
 }
 

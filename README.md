@@ -43,7 +43,7 @@ consultor não precisa logar em 5 sistemas diferentes por imóvel, todo dia, par
 | 5 | 🚧 core pronto | Página de Detalhes (5 abas), Mapa Leaflet + camadas SEMA no navegador, workflow de alertas (status/severidade/notas), apelido — faltam score de risco (IA), anexos, cluster de marcadores |
 | 6 | 🚧 core pronto | Aba Satélite: timelapse por slider (Landsat 5 1984 → Sentinel-2 2025), split-view, **NDVI real** amostrado via `GetFeatureInfo` (WCS está desabilitado no servidor da SEMA) + gráfico de tendência — faltam GIF/MP4, downloads, falsa-cor NIR (não existe nesse servidor, ver [CAMADAS-SEMA.md](./CAMADAS-SEMA.md)) |
 | 7 | 🚧 core pronto | IA: contexto ambiental, RAG jurídico local, DeepSeek, score determinístico, análises, chat SSE e minuta de laudo editável; faltam blocos/mapas e PDF |
-| 8 | ⏳ | Gestão de Carteira (consultor) |
+| 8 | 🚧 organização pronta | Clientes/pastas e tags coloridas por CAR; faltam filtros, importação e visão consolidada |
 | 9 | ⏳ | Relatórios + Exportações + Interoperabilidade GIS |
 | 10 | ⏳ | Notificações multicanal + WhatsApp |
 | 11 | ⏳ | Plataforma / UX / Modo Campo (mobile) |
