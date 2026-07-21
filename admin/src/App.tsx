@@ -38,7 +38,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
       setUser(r.user)
       return true
     }
-    if (r.token && r.user?.role !== 'admin') return false // not admin
+    if (r.token && r.user?.role !== 'admin') return false
     return false
   }
 
@@ -96,6 +96,7 @@ function DashboardPage() {
           <a className="block px-3 py-2 rounded-lg bg-slate-800 text-white text-sm">📊 Dashboard</a>
           <a className="block px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-slate-800/50">💬 WhatsApp</a>
           <a className="block px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-slate-800/50">👥 Usuários</a>
+          <a className="block px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-slate-800/50">🌿 CARs</a>
           <a className="block px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-slate-800/50">📨 Notificações</a>
           <a className="block px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-slate-800/50">⚙️ Configurações</a>
         </nav>
@@ -122,15 +123,18 @@ function DashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* Funcionalidades */}
         <div className="glass-card p-6">
-          <h2 className="text-lg font-semibold mb-4">Funcionalidades em desenvolvimento</h2>
-          <ul className="space-y-2 text-sm text-slate-400">
-            <li>✅ Auth local (bcrypt + JWT)</li>
-            <li>✅ Login admin</li>
-            <li>⏳ WhatsApp Connect (QR Code)</li>
-            <li>⏳ CRUD de CARs</li>
-            <li>⏳ Monitoramento SCCON</li>
-            <li>⏳ WFS SEMA multicamada</li>
+          <h2 className="text-lg font-semibold mb-4">Status das Funcionalidades</h2>
+          <ul className="space-y-2 text-sm">
+            <li className="text-emerald-400">✅ Auth local (bcrypt + JWT) — Fase 1</li>
+            <li className="text-emerald-400">✅ Login admin — Fase 1</li>
+            <li className="text-emerald-400">✅ CRUD de CARs + WFS SEMA — Fase 2</li>
+            <li className="text-slate-400">⏳ WhatsApp Connect (QR Code) — Fase 5</li>
+            <li className="text-slate-400">⏳ Monitoramento SCCON — Fase 3</li>
+            <li className="text-slate-400">⏳ SEMA multicamada (embargos, infrações) — Fase 4</li>
+            <li className="text-slate-400">⏳ Deploy Cloudflare + Systemd — Fase 6</li>
           </ul>
         </div>
       </main>

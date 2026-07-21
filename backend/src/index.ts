@@ -6,6 +6,7 @@ import config from './lib/config.js'
 import { initializeSchema } from './db/connection.js'
 import authRoutes from './routes/auth.js'
 import adminRoutes from './routes/admin.js'
+import carsRoutes from './routes/cars.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -27,6 +28,7 @@ app.get('/api/health', (_req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/cars', carsRoutes)
 
 // Servir frontends em produção
 if (config.nodeEnv === 'production') {
