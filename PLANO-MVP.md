@@ -52,7 +52,7 @@ workflow de triagem de alertas, e IA que resume, pontua risco e minuta pareceres
 | **5** | **Detalhes do CAR + Mapa + Workflow de alertas** | 26 itens | 3-4 |
 | **6** | **Satélite / NDVI / Timelapse** | 20 itens | 3 |
 | **7** | **IA robusta (DeepSeek V4 Flash)** | 24 itens | 3-4 |
-| **8** | **Gestão de Carteira (consultor)** | 18 itens | 2-3 |
+| **8** | **Gestão de Carteira (consultor)** | ✅ (21/07) | 2-3 |
 | **9** | **Relatórios + Exportações + Interoperabilidade GIS** | ✅ backend pronto (21/07) | 3 |
 | **10** | **Notificações multicanal + WhatsApp** | 18 itens | 2-3 |
 | **11** | **Plataforma / UX / Modo Campo (mobile)** | 20 itens | 2-3 |
@@ -293,27 +293,43 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 
 ---
 
-## Fase 8 — Gestão de Carteira (consultor) 📂
+## Fase 8 — Gestão de Carteira (consultor) 📂 ✅ (21/07/2026)
 
 O consultor não tem 1 imóvel: tem uma **carteira**. Toda a navegação assume isso.
 
-### 8.1 Organização
+### 8.1 Organização ✅
 - [x] **Clientes/Pastas**: agrupar CARs por cliente final (proprietário)
 - [x] **Tags** e **cores** por imóvel; filtro e busca por cliente/tag/município
 - [x] Renomear/apelidar imóvel
 
-### 8.2 Importação em massa 🆕
-- [ ] Colar lista de nº de CAR (um por linha) → cria vários
-- [ ] Upload **CSV** (nº CAR, apelido, cliente, tags)
-- [ ] Upload **Shapefile (.zip) / KML / GeoJSON** com múltiplos polígonos → cria CARs por geometria
-- [ ] Barra de progresso + relatório de importação (quais acharam polígono)
+### 8.2 Importação em massa 🆕 ✅ parcial
+- [x] Colar lista de nº de CAR (um por linha, máx. 50) → cria vários — `POST /api/cars/bulk-import`
+- [x] Upload **CSV** (texto colado: nº CAR, apelido, cliente, tags separadas por `;`) — cria cliente/tags
+  automaticamente se não existirem — `POST /api/cars/bulk-import-csv`
+- [x] **Relatório de importação** (quais acharam polígono, quais falharam e por quê) — retornado na
+  resposta e exibido na UI (`▸ Importação em massa` no topo de `/dashboard/carteira`)
+- [ ] Upload **Shapefile (.zip) / KML / GeoJSON** com múltiplos polígonos → cria CARs por geometria —
+  **não implementado nesta rodada**: exigiria um parser de shapefile binário reverso (o repo só tem o
+  *writer*, portado na Fase 9.2) e ficaria desproporcional ao valor imediato; por ora a importação em
+  massa sempre resolve o polígono via WFS pelo número do CAR (mesmo caminho do cadastro manual)
+- [ ] Barra de progresso granular — a importação é síncrona (até 50 itens por vez); a UI mostra
+  spinner + relatório final, não progresso item-a-item em tempo real (evitou a complexidade de
+  job assíncrono + SSE para um lote desse tamanho)
 
-### 8.3 Visão consolidada
-- [ ] **Tabela da carteira**: colunas ordenáveis (cliente, município, área, nº alertas, score de risco, último check), filtros, busca, paginação
-- [ ] **Mapa geral da carteira**: todos os polígonos, coloridos por status/risco, clique → detalhe
-- [x] **Ranking de risco**: imóveis que precisam de atenção primeiro
-- [ ] **Dashboard analítico**: total ha monitorados, ha desmatados no período, alertas por classe/município, tendência (Recharts)
-- [ ] Ações em massa: verificar selecionados, exportar selecionados, gerar relatório da carteira
+### 8.3 Visão consolidada ✅
+Nova página `/dashboard/carteira` (link "📂 Carteira" no dashboard), 3 abas:
+- [x] **Tabela da carteira**: colunas ordenáveis (imóvel, cliente, município, área, alertas, score,
+  último check), busca, checkboxes de seleção — `pages/PortfolioPage.tsx`
+- [x] **Mapa geral da carteira**: todos os polígonos coloridos por banda de risco (Leaflet), clique → detalhe
+- [x] **Ranking de risco**: já existia no dashboard (cards de prioridade)
+- [x] **Dashboard analítico** (aba própria): total ha monitorados, imóveis, alertas por classe e por
+  município (BarChart), tendência mensal de 12 meses (LineChart) — `GET /api/portfolio/analytics`
+- [x] **Ações em massa**: verificar selecionados (SCCON+SEMA em paralelo), exportar selecionados/todos
+  (dropdown de formato, reusa o engine da Fase 9.2), gerar relatório da carteira em PDF — validado
+  interativamente (Playwright + Chrome real: seleção, botões reativos, refresh pós-ação, gráficos
+  populados com dados reais)
+- [ ] Paginação — carteiras de consultor cabem inteiras na tela por ora (dezenas de imóveis); pode virar
+  necessário se a base de usuários crescer para centenas de CARs por conta
 
 ---
 
@@ -356,8 +372,8 @@ O consultor não tem 1 imóvel: tem uma **carteira**. Toda a navegação assume 
 - [x] Exportar **todas as camadas do CAR** (ATP/ARL/APP/…) num pacote — `target=layers|all` (zip
   multi-arquivo p/ SHP/GeoJSON/CSV, multi-tabela/multi-folder p/ GPKG/KML)
 - [x] `GET /api/cars/:id/export?format=&target=` e `GET /api/cars/:id/alerts/export?format=`
-- [ ] Exportação em massa da carteira — depende das ações em massa da Fase 8.3 (endpoint de export
-  já é reaproveitável por múltiplos CARs, falta só o disparo em lote na Fase 8)
+- [x] Exportação em massa da carteira — `GET /api/portfolio/export?format=&carIds=` (todos ou
+  selecionados), botão na aba Tabela da carteira (Fase 8.3)
 
 ### 9.3 Interoperabilidade ✅
 - [x] **API Key** por usuário (`alertacar_live_…`, hash SHA-256, `Bearer <key>` ou header `X-Api-Key`,

@@ -80,6 +80,143 @@ router.post('/', async (req: AuthRequest, res) => {
   }
 })
 
+interface BulkImportRow {
+  carNumber: string
+  nickname?: string | null
+  clientName?: string | null
+  tags?: string[]
+}
+
+interface BulkImportResult {
+  carNumber: string
+  success: boolean
+  polygonFound: boolean
+  error?: string
+}
+
+/** Cria um único CAR (com organização opcional) dentro de um lote — reusa a lógica de POST /. */
+async function importOneCar(userId: string, row: BulkImportRow): Promise<BulkImportResult> {
+  const carNumber = row.carNumber.trim()
+  try {
+    const existing = db
+      .prepare('SELECT id FROM cars WHERE user_id = ? AND car_number = ? AND active = 1')
+      .get(userId, carNumber)
+    if (existing) return { carNumber, success: false, polygonFound: false, error: 'Já monitorado' }
+
+    const polygon = await fetchCarPolygon(carNumber)
+    const id = uuid()
+    db.prepare(
+      `INSERT INTO cars (id, user_id, car_number, car_number_wfs, polygon_json, area_ha, municipality, nickname)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      userId,
+      carNumber,
+      polygon?.carNumberWfs || null,
+      polygon ? JSON.stringify(polygon.geometry) : null,
+      polygon?.areaHa || null,
+      polygon?.municipality || null,
+      row.nickname?.trim().slice(0, 100) || null,
+    )
+
+    if (row.clientName?.trim()) {
+      const clientName = row.clientName.trim().slice(0, 100)
+      const existingClient = db
+        .prepare('SELECT id FROM portfolio_clients WHERE user_id = ? AND name = ?')
+        .get(userId, clientName) as any
+      const clientId = existingClient?.id || uuid()
+      if (!existingClient) {
+        db.prepare('INSERT INTO portfolio_clients (id, user_id, name) VALUES (?, ?, ?)').run(clientId, userId, clientName)
+      }
+      db.prepare('UPDATE cars SET client_id = ? WHERE id = ?').run(clientId, id)
+    }
+
+    for (const tagNameRaw of row.tags || []) {
+      const tagName = tagNameRaw.trim().slice(0, 100)
+      if (!tagName) continue
+      const existingTag = db.prepare('SELECT id FROM portfolio_tags WHERE user_id = ? AND name = ?').get(userId, tagName) as any
+      const tagId = existingTag?.id || uuid()
+      if (!existingTag) {
+        db.prepare('INSERT INTO portfolio_tags (id, user_id, name) VALUES (?, ?, ?)').run(tagId, userId, tagName)
+      }
+      db.prepare('INSERT OR IGNORE INTO car_tag_links (car_id, tag_id) VALUES (?, ?)').run(id, tagId)
+    }
+
+    return { carNumber, success: true, polygonFound: !!polygon }
+  } catch (err: any) {
+    return { carNumber, success: false, polygonFound: false, error: err?.message || 'Erro desconhecido' }
+  }
+}
+
+// POST /api/cars/bulk-import — Fase 8.2: cola lista de nº de CAR (um por linha) → cria vários
+router.post('/bulk-import', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id
+    const raw = req.body?.carNumbers
+    const list: string[] = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/\r?\n/) : []
+    const cleaned = [...new Set(list.map((s) => String(s).trim()).filter((s) => s.length >= 3))].slice(0, 50)
+
+    if (!cleaned.length) {
+      res.status(400).json({ error: 'Informe ao menos um número de CAR válido (um por linha, máx. 50)' })
+      return
+    }
+
+    const results: BulkImportResult[] = []
+    for (const carNumber of cleaned) {
+      results.push(await importOneCar(userId, { carNumber }))
+    }
+
+    res.status(201).json({ results, total: results.length, imported: results.filter((r) => r.success).length })
+  } catch (err: any) {
+    console.error('[cars] bulk-import error:', err)
+    res.status(500).json({ error: 'Erro na importação em massa' })
+  }
+})
+
+// POST /api/cars/bulk-import-csv — Fase 8.2: CSV colado "nºCAR,apelido,cliente,tag1;tag2"
+router.post('/bulk-import-csv', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id
+    const csv: string = typeof req.body?.csv === 'string' ? req.body.csv : ''
+    if (!csv.trim()) {
+      res.status(400).json({ error: 'CSV vazio' })
+      return
+    }
+
+    const lines = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    // Pula o cabeçalho se a 1ª linha não começar com um número/MT (heurística simples).
+    const dataLines = /^\s*(MT)?\d/i.test(lines[0] || '') ? lines : lines.slice(1)
+
+    const rows: BulkImportRow[] = dataLines
+      .slice(0, 50)
+      .map((line) => {
+        const [carNumber, nickname, clientName, tagsStr] = line.split(',').map((c) => c?.trim())
+        return {
+          carNumber: carNumber || '',
+          nickname: nickname || null,
+          clientName: clientName || null,
+          tags: tagsStr ? tagsStr.split(';').map((t) => t.trim()).filter(Boolean) : [],
+        }
+      })
+      .filter((r) => r.carNumber.length >= 3)
+
+    if (!rows.length) {
+      res.status(400).json({ error: 'Nenhuma linha válida (formato: nºCAR,apelido,cliente,tag1;tag2)' })
+      return
+    }
+
+    const results: BulkImportResult[] = []
+    for (const row of rows) {
+      results.push(await importOneCar(userId, row))
+    }
+
+    res.status(201).json({ results, total: results.length, imported: results.filter((r) => r.success).length })
+  } catch (err: any) {
+    console.error('[cars] bulk-import-csv error:', err)
+    res.status(500).json({ error: 'Erro na importação em massa via CSV' })
+  }
+})
+
 // GET /api/cars — Listar CARs do usuário
 router.get('/', (req: AuthRequest, res) => {
   try {

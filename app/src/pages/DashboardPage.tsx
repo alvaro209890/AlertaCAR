@@ -105,6 +105,9 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <button onClick={() => setLocation('/dashboard/carteira')} className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1 rounded-lg hover:bg-slate-800">
+              📂 Carteira
+            </button>
             <button onClick={logout} className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1 rounded-lg hover:bg-slate-800">
               Sair
             </button>

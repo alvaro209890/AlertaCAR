@@ -13,6 +13,32 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   return res.json()
 }
 
+/** Baixa um arquivo binário (PDF/ZIP/GPKG/…) autenticado e dispara o download no navegador. */
+export async function apiDownload(endpoint: string, suggestedFilename?: string): Promise<{ error?: string }> {
+  const token = localStorage.getItem('alertacar_token')
+  const res = await fetch(`${API}${endpoint}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) return await res.json()
+    return { error: `Erro ao baixar (HTTP ${res.status})` }
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('content-disposition') || ''
+  const match = disposition.match(/filename="?([^"]+)"?/)
+  const filename = match?.[1] || suggestedFilename || 'download'
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+  return {}
+}
+
 export async function apiStream(
   endpoint: string,
   options: RequestInit,

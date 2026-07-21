@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import CarDetailPage from './pages/CarDetailPage'
+import PortfolioPage from './pages/PortfolioPage'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -26,6 +27,9 @@ export default function App() {
         </Route>
         <Route path="/dashboard/cars/:id">
           <ProtectedRoute><CarDetailPage /></ProtectedRoute>
+        </Route>
+        <Route path="/dashboard/carteira">
+          <ProtectedRoute><PortfolioPage /></ProtectedRoute>
         </Route>
         <Route path="/">
           <LoginPage />

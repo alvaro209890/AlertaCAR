@@ -86,3 +86,20 @@ export interface NdviTrendResult {
   deltaNdvi: number | null
   classificacao: 'recuperando' | 'estavel' | 'perdendo_vegetacao' | 'indeterminado'
 }
+
+export interface PortfolioAnalytics {
+  totalAreaHa: number
+  totalImoveis: number
+  alertsByClass: Array<{ classType: string; count: number }>
+  alertsByMunicipality: Array<{ municipality: string; count: number }>
+  monthlyTrend: Array<{ month: string; count: number }>
+}
+
+export interface BulkImportResult {
+  carNumber: string
+  success: boolean
+  polygonFound: boolean
+  error?: string
+}
+
+export type ExportFormat = 'geojson' | 'kml' | 'kmz' | 'shp' | 'csv' | 'gpkg'
