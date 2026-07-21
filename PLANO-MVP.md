@@ -57,7 +57,7 @@ workflow de triagem de alertas, e IA que resume, pontua risco e minuta pareceres
 | **10** | **Notificações multicanal + WhatsApp** | 18 itens | 2-3 |
 | **11** | **Plataforma / UX / Modo Campo (mobile)** | 20 itens | 2-3 |
 | **12** | **Admin avançado + Segurança + Deploy + Backup** | 20 itens | 2 |
-| **13** | **Ferramentas GIS de conformidade** (reúso GeoForest) | 18 itens | 3 |
+| **13** | **Ferramentas GIS de conformidade** (reúso GeoForest) | ✅ backend (21/07) | 3 |
 
 **Total estimado do novo escopo: ~28-33 dias** para a plataforma completa e polida.
 
@@ -451,36 +451,66 @@ Nova página `/dashboard/carteira` (link "📂 Carteira" no dashboard), 3 abas:
 
 ---
 
-## Fase 13 — Ferramentas GIS de conformidade 🧰 (reúso GeoForest)
+## Fase 13 — Ferramentas GIS de conformidade 🧰 (reúso GeoForest) ✅ backend pronto (21/07/2026)
 
 O consultor não quer só ser avisado — quer **validar e processar** o CAR. O GeoForest já é, na prática, um
 validador SIMCAR/SEMA. Trazer como aba **"Ferramentas"** transforma o AlertaCAR de monitor em plataforma de
-trabalho. Cada ferramenta segue o padrão job assíncrono + SSE (upload → processa → progresso → ZIP).
-Ver [REUSO-GEOFOREST.md §6](./REUSO-GEOFOREST.md).
+trabalho. Ver [REUSO-GEOFOREST.md §6](./REUSO-GEOFOREST.md).
 
-### 13.1 Validação de geometria (importador SEMA)
-- [ ] Portar `geometry-errors.ts` + `simcar-rules.ts`: borda se cruza, pontos repetidos, contenção/sobreposição do Anexo 01
-- [ ] Tolerâncias calibradas contra o PDF oficial (snap 0,05 m; dups 0,1 m)
-- [ ] Relatório de erros (tabela + shapefile de pontos/áreas problemáticas)
+> **Desvio do plano original:** o texto original previa "cada ferramenta segue o padrão job assíncrono +
+> SSE" do GeoForest (upload → processa → progresso → ZIP), com armazenamento de arquivo do usuário
+> (`local-storage.ts`) e fila de job (`processing-jobs.ts`). Como o caso de uso do AlertaCAR é validar um
+> shapefile que o consultor sobe manualmente (não o pipeline de importação em massa do GeoForest), os 4
+> endpoints (`/api/tools/validate-geometry`, `/vertices-proximas`, `/containment`, `/processar-geo`) foram
+> implementados **síncronos** (upload multipart → JSON de resposta direto), sem essa infraestrutura.
+>
+> ⚠️ **Descoberta importante durante a implementação:** testando com Projetos Geográficos REAIS (fixtures
+> do GeoForest — CAR Santa Clara, ~28 camadas), `detectGaps`/`detectOverlaps`/`detectSimcarContainment`
+> (comparação par-a-par de feições/vértices, sem índice espacial) **travaram o processo por 5+ minutos**
+> numa única camada densa (ex.: 88 feições / 9.899 vértices levaram 35s só no `detectGaps`; o Projeto
+> inteiro, com ARL/AVN de 242 feições cada, nunca terminou). Como o Node é single-thread, isso travaria a
+> API **inteira para todos os usuários** durante o processamento — inaceitável num endpoint síncrono.
+> Mitigação aplicada (`backend/src/routes/tools.ts`): limites de complexidade calibrados empiricamente
+> (por camada: 50 feições / 3.000 vértices; total do projeto: 300 feições / 15.000 vértices) — acima
+> disso, os checks par-a-par são **pulados com aviso explícito** (nunca silenciosamente "aprovados"), mas
+> os checks O(vértices) por feição (auto-interseção, vértices duplicados) continuam rodando sempre. O
+> `processar-geo` reforça isso no gate: se qualquer check foi pulado por complexidade, o gate recusa
+> processar (não pode garantir conformidade sem ter rodado tudo). Validado ao vivo: fixture real de 815
+> feições/86mil vértices que antes travava indefinidamente agora responde em ~9,7s com os avisos corretos;
+> fixture pequeno (3 erros esperados) responde em 16ms sem falso-positivo de aviso. **Isso é uma limitação
+> de escala conhecida, não um bug oculto** — Projetos Geográficos muito densos precisam de processamento
+> assíncrono de verdade (worker/fila), que fica para uma iteração futura caso vire gargalo real de uso.
 
-### 13.2 Vértices próximas
-- [ ] Portar `vertices-proximas.ts`: pares de vértices coincidentes por camada/feição/parte/anel
-- [ ] Saídas `pontos_vertices_proximas.shp`, `resumo_vertices.csv`
+### 13.1 Validação de geometria (importador SEMA) ✅
+- [x] Portado `geometry-errors.ts` + `simcar-rules.ts` (verbatim, cortado por linha exata — não
+  retranscrito à mão): borda se cruza, pontos repetidos, contenção/sobreposição do Anexo 01, soma AIR×ATP
+- [x] Tolerâncias preservadas exatamente do original (`SIMCAR_IMPORT_DUP_TOLERANCE_M = 0.1`,
+  `SIMCAR_IMPORT_COLLAPSE_WIDTH_M = 0.02` etc. — verificado igual ao GeoForest)
+- [x] `POST /api/tools/validate-geometry` (upload .zip) — relatório JSON de erros/camadas/avisos, com
+  export opcional (`?format=shp|csv|geojson|kml|kmz|gpkg`) dos pontos problemáticos via `gis-export.ts`
 
-### 13.3 Áreas não contidas (containment)
-- [ ] Portar `containment-analysis.ts`: `alvo − união(continentes)` (erro "deve ser contido por AVN/AUAS/AC")
-- [ ] Alvo/continentes configuráveis; área mínima (padrão 1 m²); saída em SHP + CSV
+### 13.2 Vértices próximas ✅
+- [x] Portado `vertices-proximas.ts`: pares de vértices coincidentes por camada/feição/parte/anel
+- [x] `POST /api/tools/vertices-proximas` — mesmo padrão de export opcional
 
-### 13.4 ProcessarGeo (buffers do Código Florestal)
-- [ ] Portar `simcar-processar-geo.ts`: gera APP / APPD / APPRL / AURD / ARLDR por buffers hídricos e de relevo
-- [ ] Gate de importação (só processa se a geometria passar na 13.1, igual à SEMA)
+### 13.3 Áreas não contidas (containment) ✅
+- [x] Portado `containment-analysis.ts`: `alvo − união(continentes)` (erro "deve ser contido por AVN/AUAS/AC")
+- [x] `POST /api/tools/containment` — alvo/continentes por nome de camada no body, área mínima configurável
 
-### 13.5 Recorte de camadas do CAR
-- [ ] Portar `simcar-clip.ts` (TEMPLATE_LAYERS): recorta ARL/APP/AUAS/AVN/nascentes/rios ao polígono do imóvel
-- [ ] Alimenta a **aba Camadas** (Fase 5.3) e o pacote de export (Fase 9.2)
+### 13.4 ProcessarGeo (buffers do Código Florestal) ✅
+- [x] Portado `simcar-processar-geo.ts` → `processar-geo.ts`: gera APP/APPD/APPRL/AURD/ARLDR por buffers
+  hídricos e de relevo
+- [x] `POST /api/tools/processar-geo` com **gate de importação** real (só processa se 13.1 passar E não
+  tiver pulado nenhum check por complexidade)
 
-### 13.6 UX
-- [ ] Aba **Ferramentas** no app; drag-and-drop de ZIP (shp/dbf/prj)
+### 13.5 Recorte de camadas do CAR — não portado (decisão consciente)
+- [ ] `simcar-clip.ts` (10.536 linhas, majoritariamente infra de upload+SSE+Gemini+Excel pra clipar
+  camadas WFS da SEMA contra um polígono enviado) **não foi portado** — o AlertaCAR já cobre o mesmo caso
+  de uso via `fetchAllCarLayers`/`fetchCarLayerFeatures` (Fase 4, `wfs-car-layers.ts`) + o export de
+  camadas (Fase 9.2, `target=layers` em `/api/cars/:id/export`)
+
+### 13.6 UX — pendente (frontend)
+- [ ] Aba **Ferramentas** no app; drag-and-drop de ZIP (shp/dbf/prj) — endpoints prontos, falta a tela
 - [ ] Vincular o resultado a um CAR da carteira (anexa laudo/erros ao imóvel)
 
 ---

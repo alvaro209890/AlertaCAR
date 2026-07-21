@@ -17,6 +17,7 @@ import exportRoutes from './routes/export.js'
 import interopRoutes from './routes/interop.js'
 import reportsRoutes from './routes/reports.js'
 import publicReportsRoutes from './routes/public-reports.js'
+import toolsRoutes from './routes/tools.js'
 import { startCronMonitor } from './cron/monitor.js'
 import { startReportSchedulesCron } from './cron/reports.js'
 
@@ -55,6 +56,7 @@ app.use('/api/portfolio', portfolioRoutes)
 app.use('/api', exportRoutes)
 app.use('/api', interopRoutes)
 app.use('/api', reportsRoutes)
+app.use('/api/tools', toolsRoutes)
 
 // Servir frontends em produção
 if (config.nodeEnv === 'production') {
