@@ -17,10 +17,15 @@ export default function DashboardPage() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [checking, setChecking] = useState<string | null>(null)
   const [checkMsg, setCheckMsg] = useState<{ carId: string; text: string; type: 'ok' | 'err' } | null>(null)
+  const [riskByCar, setRiskByCar] = useState<Record<string, { score: number; band: string }>>({})
 
   const loadCars = () => {
-    apiFetch('/cars').then(r => {
-      if (r.cars) setCars(r.cars)
+    apiFetch('/cars').then(async r => {
+      if (r.cars) {
+        setCars(r.cars)
+        const risks = await apiFetch('/ai/risk-scores')
+        if (Array.isArray(risks.scores)) setRiskByCar(Object.fromEntries(risks.scores.map((risk: { carId: string; score: number; band: string }) => [risk.carId, risk])))
+      }
     }).finally(() => setLoading(false))
   }
 
@@ -190,6 +195,11 @@ export default function DashboardPage() {
                           {car.alertCount} alerta{car.alertCount !== 1 ? 's' : ''}
                         </span>
                       )}
+                      {riskByCar[car.id] && (
+                        <span className={`text-xs px-2 py-0.5 rounded border ${riskBadgeClass(riskByCar[car.id].band)}`}>
+                          Risco {riskByCar[car.id].score}
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-4 text-sm text-slate-400">
                       {car.municipality && <span>📍 {car.municipality}</span>}
@@ -240,4 +250,11 @@ export default function DashboardPage() {
       </div>
     </div>
   )
+}
+
+function riskBadgeClass(band: string) {
+  if (band === 'critico') return 'bg-red-500/10 text-red-400 border-red-500/20'
+  if (band === 'alto') return 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+  if (band === 'medio') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+  return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
 }

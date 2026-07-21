@@ -288,7 +288,7 @@ tendência 2016→2025 com 27/27 pontos amostrados com sucesso em cada ano, clas
 ### 7.5 UX de IA no app
 - [x] Aba **IA** na página do CAR (chat + score + botões de resumo, próximos passos e minuta de laudo)
 - [x] Widget "Pergunte sobre sua carteira" no dashboard
-- [ ] Badge de score de risco nos cards e na tabela da carteira
+- [x] Badge de score de risco nos cards da carteira (cálculo determinístico em lote; tabela da Fase 8 ainda pendente)
 
 ---
 

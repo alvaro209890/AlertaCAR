@@ -17,6 +17,22 @@ router.get('/ai/status', (_req, res) => {
   res.json({ configured: isAiConfigured(), disclaimer: DISCLAIMER, knowledge: legalKnowledgeHealth() })
 })
 
+// GET /api/ai/risk-scores — lote determinístico para badges da carteira, sem custo de IA.
+router.get('/ai/risk-scores', (req: AuthRequest, res) => {
+  try {
+    const cars = db.prepare('SELECT id FROM cars WHERE user_id = ? AND active = 1').all(req.user!.id) as Array<{ id: string }>
+    const scores = cars.flatMap((car) => {
+      const context = buildCarContext(car.id, req.user!.id)
+      if (!context) return []
+      const risk = calculateRiskScore(context)
+      return [{ carId: car.id, score: risk.score, band: risk.band }]
+    })
+    res.json({ scores })
+  } catch (error) {
+    handleError(res, error)
+  }
+})
+
 // GET /api/cars/:id/risk-score — score é determinístico; a IA apenas explica os fatores calculados.
 router.get('/cars/:carId/risk-score', async (req: AuthRequest, res) => {
   try {
